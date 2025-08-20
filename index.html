@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電子雞遊戲</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="320" height="240"></canvas>
+        <div id="game-ui">
+            <!-- UI 元件將在這裡 -->
+        </div>
+    </div>
+
+    <!-- 遊戲腳本 -->
+    <script src="src/utils/constants.js"></script>
+    <script src="src/utils/helpers.js"></script>
+    <script src="src/core/tamagotchi.js"></script>
+    <script src="src/core/timeSystem.js"></script>
+    <script src="src/core/gameState.js"></script>
+    <script src="src/render/renderer.js"></script>
+    <script src="src/ui/interface.js"></script>
+    <script src="src/core/game.js"></script>
+</body>
+</html>
