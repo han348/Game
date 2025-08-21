@@ -20,22 +20,27 @@ class GameInterface {
     
     // 根據遊戲狀態更新 UI
     updateUI(state) {
-        this.clearUI();
-        this.clearCanvas();
-        
         switch (state) {
             case GameState.STATES.MENU:
+                this.clearUI();
+                this.clearCanvas();
                 this.stopTimeDisplayUpdate();
                 this.renderMenuScreen();
                 break;
             case GameState.STATES.PLAYING:
+                this.clearUI();
+                this.clearCanvas();
                 this.renderGameScreen();
                 this.startTimeDisplayUpdate();
                 break;
             case GameState.STATES.PAUSED:
+                // 確保有遊戲背景，然後添加暫停對話框
+                this.ensureGameBackground();
                 this.renderPauseDialog();
                 break;
             case GameState.STATES.CONFIRM_RESET:
+                // 確保有遊戲背景，然後添加重置確認對話框
+                this.ensureGameBackground();
                 this.renderConfirmDialog();
                 break;
         }
@@ -52,6 +57,14 @@ class GameInterface {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
     
+    // 確保有遊戲背景（用於彈窗狀態）
+    ensureGameBackground() {
+        // 如果 UI 容器是空的，說明沒有遊戲背景，需要重新渲染
+        if (this.uiContainer.children.length === 0) {
+            this.renderGameScreen();
+        }
+    }
+    
     // 渲染待機畫面
     renderMenuScreen() {
         // Canvas 上的標題
@@ -63,8 +76,8 @@ class GameInterface {
         this.ctx.font = '12px monospace';
         this.ctx.fillText('Tamagotchi Game', this.canvas.width / 2, 100);
         
-        // 簡單的像素圖案 (代表電子雞)
-        this.drawPixelPet(this.canvas.width / 2 - 16, 120);
+        // 顯示電子雞
+        this.drawCurrentPet(this.canvas.width / 2 - 16, 120);
         
         // UI 按鈕
         const startButton = this.createButton('開始遊戲', () => {
@@ -75,7 +88,18 @@ class GameInterface {
         startButton.style.fontSize = '16px';
         startButton.style.padding = '12px 24px';
         
+        // 選單中的寵物圖鑑按鈕
+        const menuEncyclopediaButton = this.createButton('寵物圖鑑', () => {
+            this.showPetEncyclopedia();
+        });
+        menuEncyclopediaButton.className = 'game-button';
+        menuEncyclopediaButton.style.backgroundColor = '#6644aa';
+        menuEncyclopediaButton.style.fontSize = '14px';
+        menuEncyclopediaButton.style.padding = '8px 16px';
+        menuEncyclopediaButton.style.marginTop = '10px';
+        
         this.uiContainer.appendChild(startButton);
+        this.uiContainer.appendChild(menuEncyclopediaButton);
         
         // 版本資訊
         const versionInfo = document.createElement('div');
@@ -111,8 +135,8 @@ class GameInterface {
             }
         }
         
-        // 臨時顯示電子雞
-        this.drawPixelPet(this.canvas.width / 2 - 16, 120);
+        // 顯示電子雞（根據當前外型）
+        this.drawCurrentPet(this.canvas.width / 2 - 16, 120);
         
         // 狀態列
         this.renderStatusBar();
@@ -283,7 +307,13 @@ class GameInterface {
             console.log('清潔');
         });
         
-        [feedButton, playButton, cleanButton].forEach(button => {
+        // 寵物圖鑑按鈕
+        const encyclopediaButton = this.createButton('寵物圖鑑', () => {
+            this.showPetEncyclopedia();
+        });
+        encyclopediaButton.style.backgroundColor = '#6644aa';
+        
+        [feedButton, playButton, cleanButton, encyclopediaButton].forEach(button => {
             actionContainer.appendChild(button);
         });
         
@@ -417,35 +447,460 @@ class GameInterface {
         }
     }
     
-    // 繪製簡單的像素電子雞
-    drawPixelPet(x, y) {
-        const size = 2; // 像素大小
-        this.ctx.fillStyle = '#ffff00'; // 黃色
+    // 根據當前外型繪製寵物
+    drawCurrentPet(x, y) {
+        // 先清除寵物區域（包含可能的尾羽等延伸部分）
+        this.clearPetArea(x - 15, y - 15, 70, 50);
         
-        // 簡單的 8x8 像素圖案
+        // 從遊戲實例獲取當前外型
+        const gameInstance = getGameInstance();
+        if (!gameInstance || !gameInstance.gameData) {
+            // 如果沒有遊戲資料，顯示預設蛋形態
+            this.drawEgg(x, y);
+            return;
+        }
+        
+        const currentAppearance = gameInstance.gameData.tamagotchi.currentAppearance;
+        
+        switch (currentAppearance) {
+            case PET_EVOLUTION.STAGES.EGG:
+                this.drawEgg(x, y);
+                break;
+            case PET_EVOLUTION.STAGES.BABY:
+                this.drawBaby(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.CHICKEN:
+                this.drawChicken(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.PEACOCK:
+                this.drawPeacock(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.PHOENIX:
+                this.drawPhoenix(x, y);
+                break;
+            default:
+                this.drawEgg(x, y);
+        }
+    }
+    
+    // 清除寵物區域
+    clearPetArea(x, y, width, height) {
+        if (this.gameState.isState(GameState.STATES.PLAYING)) {
+            // 遊戲中背景是灰色
+            this.ctx.fillStyle = '#333333';
+        } else {
+            // 選單中背景是黑色
+            this.ctx.fillStyle = '#000000';
+        }
+        this.ctx.fillRect(x, y, width, height);
+    }
+    
+    // 繪製蛋形態
+    drawEgg(x, y) {
+        const size = 3;
+        this.ctx.fillStyle = '#f0f0f0'; // 白色蛋殼
+        
         const pattern = [
             [0,0,1,1,1,1,0,0],
             [0,1,1,1,1,1,1,0],
-            [1,1,0,1,1,0,1,1],
             [1,1,1,1,1,1,1,1],
-            [1,1,1,0,0,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,1],
             [0,1,1,1,1,1,1,0],
+            [0,0,1,1,1,1,0,0]
+        ];
+        
+        this.drawPixelPattern(x, y, pattern, size, '#f0f0f0');
+        
+        // 蛋殼花紋
+        this.ctx.fillStyle = '#e0e0e0';
+        this.ctx.fillRect(x + 6, y + 9, 6, 3);
+        this.ctx.fillRect(x + 18, y + 15, 9, 3);
+    }
+    
+    // 繪製幼年體（小雞）
+    drawBaby(x, y) {
+        const size = 3;
+        
+        // 身體
+        const bodyPattern = [
+            [0,0,1,1,1,1,0,0],
+            [0,1,1,1,1,1,1,0],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [0,1,1,1,1,1,1,0],
+            [0,0,1,0,0,1,0,0],
+            [0,0,0,0,0,0,0,0]
+        ];
+        
+        this.drawPixelPattern(x, y, bodyPattern, size, '#ffdd00');
+        
+        // 眼睛
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(x + 6, y + 6, 3, 3);
+        this.ctx.fillRect(x + 15, y + 6, 3, 3);
+        
+        // 嘴巴
+        this.ctx.fillStyle = '#ff8800';
+        this.ctx.fillRect(x + 9, y + 12, 6, 3);
+    }
+    
+    // 繪製成年雞
+    drawChicken(x, y) {
+        const size = 3;
+        
+        // 身體
+        const bodyPattern = [
+            [0,0,1,1,1,1,0,0],
+            [0,1,1,1,1,1,1,0],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [0,1,1,0,0,1,1,0],
             [0,0,1,0,0,1,0,0]
         ];
+        
+        this.drawPixelPattern(x, y, bodyPattern, size, '#ffffff');
+        
+        // 雞冠
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(x + 6, y - 3, 3, 6);
+        this.ctx.fillRect(x + 12, y - 6, 3, 9);
+        this.ctx.fillRect(x + 18, y - 3, 3, 6);
+        
+        // 眼睛
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(x + 6, y + 6, 3, 3);
+        this.ctx.fillRect(x + 15, y + 6, 3, 3);
+        
+        // 嘴巴
+        this.ctx.fillStyle = '#ff8800';
+        this.ctx.fillRect(x + 9, y + 12, 6, 3);
+    }
+    
+    // 繪製孔雀
+    drawPeacock(x, y) {
+        const size = 3;
+        
+        // 身體
+        const bodyPattern = [
+            [0,0,1,1,1,1,0,0],
+            [0,1,1,1,1,1,1,0],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [0,1,1,0,0,1,1,0],
+            [0,0,1,0,0,1,0,0]
+        ];
+        
+        this.drawPixelPattern(x, y, bodyPattern, size, '#0080ff');
+        
+        // 孔雀尾羽（背景）
+        this.ctx.fillStyle = '#00ff80';
+        this.ctx.fillRect(x - 9, y - 6, 3, 6);
+        this.ctx.fillRect(x - 6, y - 9, 3, 9);
+        this.ctx.fillRect(x - 3, y - 6, 3, 6);
+        this.ctx.fillRect(x + 27, y - 6, 3, 6);
+        this.ctx.fillRect(x + 30, y - 9, 3, 9);
+        this.ctx.fillRect(x + 33, y - 6, 3, 6);
+        
+        // 眼睛斑點
+        this.ctx.fillStyle = '#8800ff';
+        this.ctx.fillRect(x - 6, y - 6, 3, 3);
+        this.ctx.fillRect(x + 30, y - 6, 3, 3);
+        
+        // 眼睛
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(x + 6, y + 6, 3, 3);
+        this.ctx.fillRect(x + 15, y + 6, 3, 3);
+        
+        // 嘴巴
+        this.ctx.fillStyle = '#ff8800';
+        this.ctx.fillRect(x + 9, y + 12, 6, 3);
+    }
+    
+    // 繪製鳳凰
+    drawPhoenix(x, y) {
+        const size = 3;
+        
+        // 身體
+        const bodyPattern = [
+            [0,0,1,1,1,1,0,0],
+            [0,1,1,1,1,1,1,0],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1],
+            [0,1,1,0,0,1,1,0],
+            [0,0,1,0,0,1,0,0]
+        ];
+        
+        this.drawPixelPattern(x, y, bodyPattern, size, '#ff8800');
+        
+        // 鳳凰火焰尾羽
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(x - 9, y - 3, 3, 12);
+        this.ctx.fillRect(x + 30, y - 3, 3, 12);
+        
+        this.ctx.fillStyle = '#ff4400';
+        this.ctx.fillRect(x - 6, y - 6, 3, 15);
+        this.ctx.fillRect(x + 27, y - 6, 3, 15);
+        
+        this.ctx.fillStyle = '#ffff00';
+        this.ctx.fillRect(x - 3, y - 9, 3, 18);
+        this.ctx.fillRect(x + 24, y - 9, 3, 18);
+        
+        // 鳳凰冠羽
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(x + 6, y - 9, 3, 9);
+        this.ctx.fillRect(x + 15, y - 12, 3, 12);
+        this.ctx.fillRect(x + 12, y - 6, 3, 6);
+        
+        // 眼睛（發光效果）
+        this.ctx.fillStyle = '#ffff00';
+        this.ctx.fillRect(x + 6, y + 6, 3, 3);
+        this.ctx.fillRect(x + 15, y + 6, 3, 3);
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillRect(x + 7, y + 7, 1, 1);
+        this.ctx.fillRect(x + 16, y + 7, 1, 1);
+        
+        // 嘴巴
+        this.ctx.fillStyle = '#ff8800';
+        this.ctx.fillRect(x + 9, y + 12, 6, 3);
+    }
+    
+    // 通用像素圖案繪製方法
+    drawPixelPattern(x, y, pattern, size, color) {
+        this.ctx.fillStyle = color;
         
         for (let row = 0; row < pattern.length; row++) {
             for (let col = 0; col < pattern[row].length; col++) {
                 if (pattern[row][col] === 1) {
                     this.ctx.fillRect(
-                        x + col * size * 2,
-                        y + row * size * 2,
-                        size * 2,
-                        size * 2
+                        x + col * size,
+                        y + row * size,
+                        size,
+                        size
                     );
                 }
             }
         }
+    }
+    
+    // 顯示寵物圖鑑
+    showPetEncyclopedia() {
+        // 創建圖鑑覆蓋層
+        const overlay = document.createElement('div');
+        overlay.className = 'encyclopedia-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        `;
+        
+        // 創建圖鑑容器
+        const encyclopediaContainer = document.createElement('div');
+        encyclopediaContainer.className = 'encyclopedia-container';
+        encyclopediaContainer.style.cssText = `
+            background: #2a2a2a;
+            border: 2px solid #666;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: white;
+            font-family: monospace;
+        `;
+        
+        // 標題
+        const title = document.createElement('h2');
+        title.textContent = '🐣 寵物圖鑑 🐣';
+        title.style.cssText = `
+            text-align: center;
+            margin-bottom: 20px;
+            color: #ffdd00;
+            font-size: 18px;
+        `;
+        encyclopediaContainer.appendChild(title);
+        
+        // 創建寵物展示區域
+        this.createPetGallery(encyclopediaContainer);
+        
+        // 關閉按鈕
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '關閉';
+        closeButton.className = 'game-button';
+        closeButton.style.cssText = `
+            display: block;
+            margin: 20px auto 0;
+            background: #aa4444;
+            padding: 8px 16px;
+        `;
+        closeButton.addEventListener('click', () => {
+            document.body.removeChild(overlay);
+        });
+        encyclopediaContainer.appendChild(closeButton);
+        
+        overlay.appendChild(encyclopediaContainer);
+        document.body.appendChild(overlay);
+        
+        // 點擊覆蓋層外部關閉
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) {
+                document.body.removeChild(overlay);
+            }
+        });
+    }
+    
+    // 創建寵物圖鑑展示
+    createPetGallery(container) {
+        const petData = [
+            {
+                stage: PET_EVOLUTION.STAGES.EGG,
+                name: '蛋',
+                description: '這是一個神秘的蛋，裡面蘊藏著無限的可能性。需要耐心等待它孵化。',
+                color: '#f0f0f0'
+            },
+            {
+                stage: PET_EVOLUTION.STAGES.BABY,
+                name: '小雞',
+                description: '剛孵化的小雞，充滿活力但需要細心照顧。牠會很快成長。',
+                color: '#ffdd00'
+            },
+            {
+                stage: PET_EVOLUTION.ADULT_TYPES.CHICKEN,
+                name: '雞',
+                description: '普通但可靠的成年雞，性格溫和，容易照顧。適合新手飼養者。',
+                color: '#ffffff'
+            },
+            {
+                stage: PET_EVOLUTION.ADULT_TYPES.PEACOCK,
+                name: '孔雀',
+                description: '華麗的孔雀，擁有美麗的尾羽。需要高品質的照顧才能進化成此形態。',
+                color: '#0080ff'
+            },
+            {
+                stage: PET_EVOLUTION.ADULT_TYPES.PHOENIX,
+                name: '鳳凰',
+                description: '傳說中的神鳥，擁有火焰般的羽毛和神秘的力量。極其罕見的最高進化形態。',
+                color: '#ff8800'
+            }
+        ];
+        
+        petData.forEach((pet, index) => {
+            const petCard = document.createElement('div');
+            petCard.className = 'pet-card';
+            petCard.style.cssText = `
+                display: flex;
+                align-items: center;
+                margin-bottom: 15px;
+                padding: 15px;
+                background: #3a3a3a;
+                border-radius: 8px;
+                border-left: 4px solid ${pet.color};
+            `;
+            
+            // 寵物圖像容器
+            const petImageContainer = document.createElement('div');
+            petImageContainer.style.cssText = `
+                width: 80px;
+                height: 60px;
+                margin-right: 15px;
+                position: relative;
+            `;
+            
+            // 創建小畫布來繪製寵物
+            const petCanvas = document.createElement('canvas');
+            petCanvas.width = 80;
+            petCanvas.height = 60;
+            petCanvas.style.cssText = `
+                background: #1a1a1a;
+                border-radius: 4px;
+                image-rendering: pixelated;
+            `;
+            
+            const petCtx = petCanvas.getContext('2d');
+            petCtx.imageSmoothingEnabled = false;
+            
+            // 繪製寵物
+            this.drawPetInCanvas(petCtx, pet.stage, 16, 8);
+            
+            petImageContainer.appendChild(petCanvas);
+            
+            // 寵物資訊
+            const petInfo = document.createElement('div');
+            petInfo.style.cssText = `
+                flex: 1;
+            `;
+            
+            const petName = document.createElement('h3');
+            petName.textContent = pet.name;
+            petName.style.cssText = `
+                margin: 0 0 8px 0;
+                color: ${pet.color};
+                font-size: 16px;
+            `;
+            
+            const petDescription = document.createElement('p');
+            petDescription.textContent = pet.description;
+            petDescription.style.cssText = `
+                margin: 0;
+                font-size: 12px;
+                line-height: 1.4;
+                color: #ccc;
+            `;
+            
+            petInfo.appendChild(petName);
+            petInfo.appendChild(petDescription);
+            
+            petCard.appendChild(petImageContainer);
+            petCard.appendChild(petInfo);
+            
+            container.appendChild(petCard);
+        });
+    }
+    
+    // 在小畫布中繪製寵物
+    drawPetInCanvas(ctx, petType, x, y) {
+        const originalCtx = this.ctx;
+        this.ctx = ctx;
+        
+        // 清除背景
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        
+        // 根據類型繪製寵物
+        switch (petType) {
+            case PET_EVOLUTION.STAGES.EGG:
+                this.drawEgg(x, y);
+                break;
+            case PET_EVOLUTION.STAGES.BABY:
+                this.drawBaby(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.CHICKEN:
+                this.drawChicken(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.PEACOCK:
+                this.drawPeacock(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.PHOENIX:
+                this.drawPhoenix(x, y);
+                break;
+        }
+        
+        this.ctx = originalCtx;
     }
     
     // 時間管理相關方法

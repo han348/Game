@@ -51,3 +51,53 @@ const SPRITE_CONFIG = {
         SLEEPING: 5
     }
 };
+
+const PET_EVOLUTION = {
+    // 進化階段
+    STAGES: {
+        EGG: 'EGG',           // 蛋階段
+        BABY: 'BABY',         // 幼年體（小雞）
+        ADULT: 'ADULT'        // 成年體
+    },
+    
+    // 成年體類型
+    ADULT_TYPES: {
+        CHICKEN: 'CHICKEN',   // 雞
+        PEACOCK: 'PEACOCK',   // 孔雀
+        PHOENIX: 'PHOENIX'    // 鳳凰
+    },
+    
+    // 進化條件
+    EVOLUTION_CONDITIONS: {
+        EGG_TO_BABY: {
+            minAge: 1,        // 1天後孵化
+            minHappiness: 50
+        },
+        BABY_TO_ADULT: {
+            minAge: 7,        // 7天後成年
+            minLevel: 5
+        }
+    },
+    
+    // 各形態的基本屬性倍率
+    STAGE_MULTIPLIERS: {
+        EGG: {
+            hungerDecay: 0.5,    // 蛋階段餓得較慢
+            happinessDecay: 0.3,
+            healthDecay: 0.2,
+            cleanlinessDecay: 0.1
+        },
+        BABY: {
+            hungerDecay: 1.5,    // 幼年體餓得較快
+            happinessDecay: 1.2,
+            healthDecay: 0.8,
+            cleanlinessDecay: 1.0
+        },
+        ADULT: {
+            hungerDecay: 1.0,    // 成年體標準速度
+            happinessDecay: 1.0,
+            healthDecay: 1.0,
+            cleanlinessDecay: 1.0
+        }
+    }
+};
