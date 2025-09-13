@@ -8,12 +8,29 @@ class GameInterface {
         this.canvas = document.getElementById('game-canvas');
         this.ctx = this.canvas.getContext('2d');
         this.timeDisplayInterval = null;
-        
+
+        // 寵物輪播系統
+        this.petCarousel = {
+            currentPetIndex: 0,
+            pets: [
+                { type: PET_EVOLUTION.STAGES.EGG, name: '神秘的蛋' },
+                { type: PET_EVOLUTION.STAGES.BABY, name: '可愛小雞' },
+                { type: PET_EVOLUTION.ADULT_TYPES.CHICKEN, name: '溫和雞' },
+                { type: PET_EVOLUTION.ADULT_TYPES.PEACOCK, name: '華麗孔雀' },
+                { type: PET_EVOLUTION.ADULT_TYPES.PHOENIX, name: '傳說鳳凰' }
+            ],
+            isAnimating: false,
+            animationTimer: null,
+            changeInterval: null,
+            transitionDuration: 1000, // 1秒過渡時間
+            displayDuration: 3000 // 每個寵物顯示3秒
+        };
+
         // 綁定狀態變更監聽
         this.gameState.addStateListener((oldState, newState) => {
             this.updateUI(newState);
         });
-        
+
         // 初始化 UI
         this.updateUI(this.gameState.getCurrentState());
     }
@@ -28,17 +45,20 @@ class GameInterface {
                 this.renderMenuScreen();
                 break;
             case GameState.STATES.PLAYING:
+                this.stopPetCarousel(); // 停止輪播
                 this.clearUI();
                 this.clearCanvas();
                 this.renderGameScreen();
                 this.startTimeDisplayUpdate();
                 break;
             case GameState.STATES.PAUSED:
+                this.stopPetCarousel(); // 停止輪播
                 // 確保有遊戲背景，然後添加暫停對話框
                 this.ensureGameBackground();
                 this.renderPauseDialog();
                 break;
             case GameState.STATES.CONFIRM_RESET:
+                this.stopPetCarousel(); // 停止輪播
                 // 確保有遊戲背景，然後添加重置確認對話框
                 this.ensureGameBackground();
                 this.renderConfirmDialog();
@@ -72,35 +92,28 @@ class GameInterface {
         this.ctx.font = '20px monospace';
         this.ctx.textAlign = 'center';
         this.ctx.fillText('電子雞遊戲', this.canvas.width / 2, 80);
-        
+
         this.ctx.font = '12px monospace';
         this.ctx.fillText('Tamagotchi Game', this.canvas.width / 2, 100);
-        
-        // 顯示電子雞
-        this.drawCurrentPet(this.canvas.width / 2 - 16, 120);
-        
+
+        // 顯示當前輪播寵物和名稱
+        this.drawCarouselPet();
+
+        // 啟動寵物輪播
+        this.startPetCarousel();
+
         // UI 按鈕
         const startButton = this.createButton('開始遊戲', () => {
+            this.stopPetCarousel(); // 停止輪播
             this.gameState.changeState(GameState.STATES.PLAYING);
         });
-        
+
         startButton.className = 'game-button';
         startButton.style.fontSize = '16px';
         startButton.style.padding = '12px 24px';
-        
-        // 選單中的寵物圖鑑按鈕
-        const menuEncyclopediaButton = this.createButton('寵物圖鑑', () => {
-            this.showPetEncyclopedia();
-        });
-        menuEncyclopediaButton.className = 'game-button';
-        menuEncyclopediaButton.style.backgroundColor = '#6644aa';
-        menuEncyclopediaButton.style.fontSize = '14px';
-        menuEncyclopediaButton.style.padding = '8px 16px';
-        menuEncyclopediaButton.style.marginTop = '10px';
-        
+
         this.uiContainer.appendChild(startButton);
-        this.uiContainer.appendChild(menuEncyclopediaButton);
-        
+
         // 版本資訊
         const versionInfo = document.createElement('div');
         versionInfo.textContent = 'v1.0.0';
@@ -799,7 +812,7 @@ class GameInterface {
             }
         ];
         
-        petData.forEach((pet, index) => {
+        petData.forEach((pet) => {
             const petCard = document.createElement('div');
             petCard.className = 'pet-card';
             petCard.style.cssText = `
@@ -946,6 +959,168 @@ class GameInterface {
         if (this.timeDisplayInterval) {
             clearInterval(this.timeDisplayInterval);
             this.timeDisplayInterval = null;
+        }
+    }
+
+    // 寵物輪播系統方法
+
+    // 繪製輪播寵物
+    drawCarouselPet() {
+        const currentPet = this.petCarousel.pets[this.petCarousel.currentPetIndex];
+        const centerX = this.canvas.width / 2;
+        const petY = 120;
+        const nameY = 180;
+
+        // 完全清除整個寵物顯示區域（包括名稱）
+        this.clearPetArea(0, petY - 30, this.canvas.width, 100);
+
+        // 繪製當前寵物
+        this.drawPetByType(currentPet.type, centerX - 16, petY);
+
+        // 繪製寵物名稱
+        this.ctx.fillStyle = '#ffdd00';
+        this.ctx.font = '14px monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(currentPet.name, centerX, nameY);
+    }
+
+    // 啟動寵物輪播
+    startPetCarousel() {
+        // 如果已經在運行，先停止
+        this.stopPetCarousel();
+
+        // 立即顯示第一個寵物
+        this.drawCarouselPet();
+
+        // 設置自動切換計時器
+        this.petCarousel.changeInterval = setInterval(() => {
+            this.nextPet();
+        }, this.petCarousel.displayDuration);
+    }
+
+    // 停止寵物輪播
+    stopPetCarousel() {
+        // 清除自動切換計時器
+        if (this.petCarousel.changeInterval) {
+            clearInterval(this.petCarousel.changeInterval);
+            this.petCarousel.changeInterval = null;
+        }
+
+        // 清除動畫計時器
+        if (this.petCarousel.animationTimer) {
+            clearTimeout(this.petCarousel.animationTimer);
+            this.petCarousel.animationTimer = null;
+        }
+
+        this.petCarousel.isAnimating = false;
+    }
+
+    // 切換到下一個寵物
+    nextPet() {
+        if (this.petCarousel.isAnimating) return;
+
+        // 更新索引
+        this.petCarousel.currentPetIndex =
+            (this.petCarousel.currentPetIndex + 1) % this.petCarousel.pets.length;
+
+        // 執行動畫
+        this.animatePetTransition();
+    }
+
+    // 執行寵物切換動畫
+    animatePetTransition() {
+        this.petCarousel.isAnimating = true;
+
+        const centerX = this.canvas.width / 2;
+        const petY = 120;
+        const nameY = 180;
+        const currentPet = this.petCarousel.pets[this.petCarousel.currentPetIndex];
+        const previousPet = this.petCarousel.pets[
+            (this.petCarousel.currentPetIndex - 1 + this.petCarousel.pets.length) % this.petCarousel.pets.length
+        ];
+
+        // 動畫參數
+        const animationSteps = 30;
+        const stepDuration = this.petCarousel.transitionDuration / animationSteps;
+        let currentStep = 0;
+
+        const animateStep = () => {
+            // 計算動畫進度 (0 到 1)
+            const progress = currentStep / animationSteps;
+
+            // 使用緩動函數 (ease-out)
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+            // 完全清除寵物和名稱顯示區域
+            this.clearPetArea(0, petY - 30, this.canvas.width, 100);
+
+            // 計算新寵物位置 (從右側滑入到中央)
+            const newPetStartX = this.canvas.width + 50;
+            const newPetEndX = centerX - 16;
+            const newPetCurrentX = newPetStartX + (newPetEndX - newPetStartX) * easeProgress;
+
+            // 計算舊寵物位置 (從中央滑出到左側)
+            const oldPetStartX = centerX - 16;
+            const oldPetEndX = -100; // 確保完全滑出左側
+            const oldPetCurrentX = oldPetStartX + (oldPetEndX - oldPetStartX) * easeProgress;
+
+            // 繪製滑出的舊寵物
+            if (oldPetCurrentX > -100 && progress < 0.8) {
+                this.drawPetByType(previousPet.type, oldPetCurrentX, petY);
+                // 繪製舊寵物名稱
+                this.ctx.fillStyle = '#ffdd00';
+                this.ctx.font = '14px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(previousPet.name, oldPetCurrentX + 16, nameY);
+            }
+
+            // 繪製滑入的新寵物
+            if (newPetCurrentX < this.canvas.width + 50) {
+                this.drawPetByType(currentPet.type, newPetCurrentX, petY);
+                // 繪製新寵物名稱
+                this.ctx.fillStyle = '#ffdd00';
+                this.ctx.font = '14px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(currentPet.name, newPetCurrentX + 16, nameY);
+            }
+
+            currentStep++;
+
+            if (currentStep <= animationSteps) {
+                // 繼續動畫
+                this.petCarousel.animationTimer = setTimeout(animateStep, stepDuration);
+            } else {
+                // 動畫完成，完全清除並重新繪製
+                this.petCarousel.isAnimating = false;
+                this.clearPetArea(0, petY - 30, this.canvas.width, 100);
+                this.drawCarouselPet();
+            }
+        };
+
+        // 開始動畫
+        animateStep();
+    }
+
+    // 根據類型繪製寵物
+    drawPetByType(petType, x, y) {
+        switch (petType) {
+            case PET_EVOLUTION.STAGES.EGG:
+                this.drawEgg(x, y);
+                break;
+            case PET_EVOLUTION.STAGES.BABY:
+                this.drawBaby(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.CHICKEN:
+                this.drawChicken(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.PEACOCK:
+                this.drawPeacock(x, y);
+                break;
+            case PET_EVOLUTION.ADULT_TYPES.PHOENIX:
+                this.drawPhoenix(x, y);
+                break;
+            default:
+                this.drawEgg(x, y);
         }
     }
 }
