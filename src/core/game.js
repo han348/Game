@@ -70,9 +70,9 @@ class TamagotchiGame {
     
     // 設定狀態監聽器
     setupStateListeners() {
-        this.gameState.addStateListener((oldState, newState, data) => {
+        this.gameState.addStateListener((oldState, newState) => {
             console.log(`遊戲狀態變更: ${oldState} -> ${newState}`);
-            
+
             // 根據狀態變更執行特定邏輯
             switch (newState) {
                 case GameState.STATES.MENU:
@@ -101,7 +101,10 @@ class TamagotchiGame {
     // 處理遊戲進行狀態
     handlePlayingState() {
         console.log('進入遊戲狀態');
-        // 載入或建立新的電子雞
+
+        // 檢查是否需要初始化新的電子雞
+        this.initializeTamagotchi();
+
         // 開始時間系統和遊戲循環
         if (this.timeSystem.gameStartTime === 0) {
             // 首次開始遊戲
@@ -127,6 +130,70 @@ class TamagotchiGame {
         // UI 已經通過 gameInterface 處理，時間系統會自動暫停
     }
     
+    // 初始化電子雞狀態
+    initializeTamagotchi() {
+        console.log('初始化電子雞狀態');
+
+        // 每次開始遊戲都重新初始化電子雞狀態
+        const currentTime = Date.now();
+        const freshTamagotchiData = {
+            name: '',
+            level: 1,
+            experience: 0,
+            age: 0,
+            hunger: TAMAGOTCHI_STATS.MAX_HUNGER,
+            happiness: TAMAGOTCHI_STATS.MAX_HAPPINESS,
+            health: TAMAGOTCHI_STATS.MAX_HEALTH,
+            cleanliness: TAMAGOTCHI_STATS.MAX_CLEANLINESS,
+            isAlive: true,
+            isSleeping: false,
+
+            // 進化系統 - 重新開始
+            evolutionStage: PET_EVOLUTION.STAGES.EGG,
+            adultType: null,
+            birthTime: currentTime,
+            evolutionTime: 0,
+
+            // 當前顯示的外型
+            currentAppearance: PET_EVOLUTION.STAGES.EGG
+        };
+
+        // 重置時間系統狀態
+        const freshTimeData = {
+            gameStartTime: 0, // 稍後會在 timeSystem.start() 中設定
+            accumulatedGameTime: 0,
+            lastUpdateTime: 0,
+            lastSpeedChangeTime: 0,
+            currentSpeed: GAME_CONFIG.DEFAULT_TIME_SPEED,
+            isPaused: false,
+            totalPausedDuration: 0
+        };
+
+        // 重置統計資料
+        const freshStatistics = {
+            totalPlayTime: 0,
+            feedCount: 0,
+            playCount: 0,
+            cleanCount: 0,
+            medicineCount: 0,
+            gamesPlayed: 0,
+            maxLevel: 1
+        };
+
+        // 更新遊戲資料
+        this.updateTamagotchiData(freshTamagotchiData);
+        this.localStorageService.updateData('time', freshTimeData);
+        this.updateStatistics(freshStatistics);
+
+        // 立即同步保存到 localStorage
+        this.syncAllGameData();
+
+        // 重新載入資料到記憶體中
+        this.gameData = this.localStorageService.getData();
+
+        console.log('電子雞狀態已重新初始化並保存:', this.gameData.tamagotchi);
+    }
+
     // 開始遊戲循環 (基本版本)
     startGameLoop() {
         // 這裡之後會加入電子雞狀態更新邏輯
@@ -265,8 +332,8 @@ class TamagotchiGame {
     // 設定資料自動同步
     setupDataSync() {
         // 監聽遊戲狀態變更並自動保存
-        this.gameState.addStateListener((oldState, newState, data) => {
-            this.syncGameStateData(newState, data);
+        this.gameState.addStateListener((oldState, newState) => {
+            this.syncGameStateData(newState);
         });
         
         // 設定定時保存 (每30秒)
@@ -278,15 +345,15 @@ class TamagotchiGame {
     }
     
     // 同步遊戲狀態資料
-    syncGameStateData(newState, data = null) {
+    syncGameStateData(newState) {
         if (!this.localStorageService) return;
-        
+
         const gameStateData = {
             currentState: newState,
             hasPlayedBefore: newState === 'PLAYING' || this.gameData.gameState.hasPlayedBefore,
             lastStateChange: Date.now()
         };
-        
+
         this.localStorageService.updateData('gameState', gameStateData);
     }
     
