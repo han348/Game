@@ -8,6 +8,11 @@ class TamagotchiGame {
         this.localStorageService = null;
         this.isInitialized = false;
         this.gameData = null;
+
+        // 飽食度相關屬性
+        this.currentHunger = TAMAGOTCHI_STATS.MAX_HUNGER;
+        this.lastHungerUpdate = 0;
+        this.gameLoopInterval = null;
     }
     
     // 初始化遊戲
@@ -194,10 +199,55 @@ class TamagotchiGame {
         console.log('電子雞狀態已重新初始化並保存:', this.gameData.tamagotchi);
     }
 
-    // 開始遊戲循環 (基本版本)
+    // 更新飽食度
+    updateHunger() {
+        if (this.timeSystem.isPaused) return;
+
+        const currentTime = Date.now();
+        if (this.lastHungerUpdate === 0) {
+            this.lastHungerUpdate = currentTime;
+            return;
+        }
+
+        const timeDiff = currentTime - this.lastHungerUpdate;
+        const minutes = timeDiff / (1000 * 60);
+
+        // 衰減 = 每分鐘2點 × 時間流速 × 經過分鐘
+        const decay = TAMAGOTCHI_STATS.HUNGER_DECAY * this.timeSystem.timeSpeed * minutes;
+
+        this.currentHunger = Math.max(0, this.currentHunger - decay);
+        this.lastHungerUpdate = currentTime;
+
+        console.log(`飽食度更新: ${Math.floor(this.currentHunger)} (衰減: ${decay.toFixed(2)})`);
+    }
+
+    // 開始遊戲循環
     startGameLoop() {
-        // 這裡之後會加入電子雞狀態更新邏輯
-        console.log('遊戲循環已開始');
+        // 初始化飽食度更新時間
+        this.lastHungerUpdate = Date.now();
+
+        // 清除舊的定時器
+        if (this.gameLoopInterval) {
+            clearInterval(this.gameLoopInterval);
+        }
+
+        // 設定定時器每秒更新
+        this.gameLoopInterval = setInterval(() => {
+            if (this.gameState.isState(GameState.STATES.PLAYING)) {
+                // 更新飽食度
+                this.updateHunger();
+
+                // 同步到 localStorage
+                this.updateTamagotchiData({ hunger: this.currentHunger });
+
+                // 更新 UI 顯示
+                if (this.gameInterface && this.gameInterface.updateHungerDisplay) {
+                    this.gameInterface.updateHungerDisplay(Math.floor(this.currentHunger));
+                }
+            }
+        }, 1000); // 每秒更新
+
+        console.log('遊戲循環已開始 - 飽食度追蹤啟動');
     }
     
     // 設定鍵盤快捷鍵
@@ -457,12 +507,18 @@ class TamagotchiGame {
             clearInterval(this.autoSaveInterval);
             this.autoSaveInterval = null;
         }
-        
+
+        // 清理遊戲循環定時器
+        if (this.gameLoopInterval) {
+            clearInterval(this.gameLoopInterval);
+            this.gameLoopInterval = null;
+        }
+
         // 最後一次保存資料
         if (this.localStorageService) {
             this.syncAllGameData();
         }
-        
+
         console.log('遊戲資源已清理');
     }
 }

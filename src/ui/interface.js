@@ -287,17 +287,23 @@ class GameInterface {
     renderStatusBar() {
         const statusBar = document.createElement('div');
         statusBar.className = 'status-bar';
-        
-        // 臨時的狀態顯示
-        const stats = ['飢餓: 80', '快樂: 90', '健康: 85', '清潔: 75'];
-        
+
+        // 動態狀態顯示
+        const currentHunger = this.getCurrentHunger();
+        const stats = [
+            `飽食度: ${currentHunger}`,
+            '快樂: 90',
+            '健康: 85',
+            '清潔: 75'
+        ];
+
         stats.forEach(stat => {
             const statusItem = document.createElement('div');
             statusItem.className = 'status-item';
             statusItem.innerHTML = `<span class="status-value">${stat}</span>`;
             statusBar.appendChild(statusItem);
         });
-        
+
         this.uiContainer.appendChild(statusBar);
     }
     
@@ -1122,5 +1128,22 @@ class GameInterface {
             default:
                 this.drawEgg(x, y);
         }
+    }
+
+    // 更新飽食度顯示
+    updateHungerDisplay(hungerValue) {
+        const statusItems = document.querySelectorAll('.status-item');
+        if (statusItems && statusItems[0]) {
+            statusItems[0].innerHTML = `<span class="status-value">飽食度: ${hungerValue}</span>`;
+        }
+    }
+
+    // 獲取當前飽食度 (供UI初始化使用)
+    getCurrentHunger() {
+        const gameInstance = getGameInstance();
+        if (gameInstance && gameInstance.currentHunger !== undefined) {
+            return Math.floor(gameInstance.currentHunger);
+        }
+        return TAMAGOTCHI_STATS.MAX_HUNGER; // 預設值
     }
 }
