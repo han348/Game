@@ -10,7 +10,7 @@ class TamagotchiGame {
         this.gameData = null;
 
         // 飽食度相關屬性
-        this.currentHunger = TAMAGOTCHI_STATS.MAX_HUNGER;
+        this.currentHunger = null; // 稍後從 localStorage 載入或設為預設值
         this.lastHungerUpdate = 0;
         this.gameLoopInterval = null;
     }
@@ -66,8 +66,14 @@ class TamagotchiGame {
             this.setupBeforeUnload();
             
             this.isInitialized = true;
+
+            // 所有初始化完成後，觸發UI初始渲染
+            if (this.gameInterface) {
+                this.gameInterface.updateUI(this.gameState.getCurrentState());
+            }
+
             console.log('電子雞遊戲初始化完成');
-            
+
         } catch (error) {
             console.error('遊戲初始化失敗:', error);
         }
@@ -107,8 +113,13 @@ class TamagotchiGame {
     handlePlayingState() {
         console.log('進入遊戲狀態');
 
-        // 檢查是否需要初始化新的電子雞
-        this.initializeTamagotchi();
+        // 初始化飽食度 (從 localStorage 載入或設預設值)
+        this.initializeHungerFromSave();
+
+        // 檢查是否需要初始化新的電子雞 (僅在首次遊戲時)
+        if (!this.gameData.gameState.hasPlayedBefore) {
+            this.initializeTamagotchi();
+        }
 
         // 開始時間系統和遊戲循環
         if (this.timeSystem.gameStartTime === 0) {
@@ -133,6 +144,24 @@ class TamagotchiGame {
     handleConfirmResetState() {
         console.log('顯示重置確認對話框（時間已暫停）');
         // UI 已經通過 gameInterface 處理，時間系統會自動暫停
+    }
+
+    // 從儲存資料初始化飽食度
+    initializeHungerFromSave() {
+        if (this.currentHunger !== null) {
+            // 已經初始化過了
+            return;
+        }
+
+        // 嘗試從 localStorage 載入飽食度
+        if (this.gameData && this.gameData.tamagotchi && this.gameData.tamagotchi.hunger !== undefined) {
+            this.currentHunger = this.gameData.tamagotchi.hunger;
+            console.log(`從儲存載入飽食度: ${this.currentHunger}`);
+        } else {
+            // 沒有儲存資料，使用預設值
+            this.currentHunger = TAMAGOTCHI_STATS.MAX_HUNGER;
+            console.log(`使用預設飽食度: ${this.currentHunger}`);
+        }
     }
     
     // 初始化電子雞狀態
@@ -219,6 +248,34 @@ class TamagotchiGame {
         this.lastHungerUpdate = currentTime;
 
         console.log(`飽食度更新: ${Math.floor(this.currentHunger)} (衰減: ${decay.toFixed(2)})`);
+    }
+
+    // 餵食功能
+    feedPet() {
+        const feedAmount = 5; // 每次餵食增加5點
+        const oldHunger = this.currentHunger;
+
+        // 增加飽食度，但不超過最大值
+        this.currentHunger = Math.min(TAMAGOTCHI_STATS.MAX_HUNGER, this.currentHunger + feedAmount);
+
+        const actualIncrease = this.currentHunger - oldHunger;
+
+        console.log(`餵食完成: ${Math.floor(oldHunger)} → ${Math.floor(this.currentHunger)} (+${actualIncrease.toFixed(1)})`);
+
+        // 立即同步到 localStorage
+        this.updateTamagotchiData({ hunger: this.currentHunger });
+
+        // 立即更新 UI
+        if (this.gameInterface && this.gameInterface.updateHungerDisplay) {
+            this.gameInterface.updateHungerDisplay(Math.floor(this.currentHunger));
+        }
+
+        return {
+            success: true,
+            oldValue: Math.floor(oldHunger),
+            newValue: Math.floor(this.currentHunger),
+            increase: actualIncrease
+        };
     }
 
     // 開始遊戲循環

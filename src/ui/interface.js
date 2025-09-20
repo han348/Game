@@ -28,11 +28,13 @@ class GameInterface {
 
         // 綁定狀態變更監聽
         this.gameState.addStateListener((oldState, newState) => {
-            this.updateUI(newState);
+            // 延遲UI更新，確保遊戲邏輯先初始化 (特別是飽食度載入)
+            setTimeout(() => {
+                this.updateUI(newState);
+            }, 0);
         });
 
-        // 初始化 UI
-        this.updateUI(this.gameState.getCurrentState());
+        // 移除立即UI渲染，改為由TamagotchiGame.init()完成後觸發
     }
     
     // 根據遊戲狀態更新 UI
@@ -315,7 +317,13 @@ class GameInterface {
         
         // 照顧按鈕
         const feedButton = this.createButton('餵食', () => {
-            console.log('餵食');
+            const gameInstance = getGameInstance();
+            if (gameInstance && gameInstance.feedPet) {
+                const result = gameInstance.feedPet();
+                console.log('餵食結果:', result);
+            } else {
+                console.log('遊戲實例未找到');
+            }
         });
         
         const playButton = this.createButton('遊戲', () => {
@@ -430,9 +438,15 @@ class GameInterface {
         if (this.timeSystem) {
             this.timeSystem.setTimeSpeed(newSpeed);
             console.log(`時間流速已變更為: ${newSpeed}x`);
-            
+
             // 更新畫面顯示
             this.updateTimeDisplay();
+
+            // 同步時間系統狀態到 localStorage
+            const gameInstance = getGameInstance();
+            if (gameInstance && gameInstance.syncTimeSystemData) {
+                gameInstance.syncTimeSystemData();
+            }
         }
     }
     
@@ -1141,9 +1155,15 @@ class GameInterface {
     // 獲取當前飽食度 (供UI初始化使用)
     getCurrentHunger() {
         const gameInstance = getGameInstance();
-        if (gameInstance && gameInstance.currentHunger !== undefined) {
+        if (gameInstance && gameInstance.currentHunger !== null && gameInstance.currentHunger !== undefined) {
             return Math.floor(gameInstance.currentHunger);
         }
-        return TAMAGOTCHI_STATS.MAX_HUNGER; // 預設值
+
+        // 如果飽食度尚未初始化，檢查是否有儲存資料
+        if (gameInstance && gameInstance.gameData && gameInstance.gameData.tamagotchi && gameInstance.gameData.tamagotchi.hunger !== undefined) {
+            return Math.floor(gameInstance.gameData.tamagotchi.hunger);
+        }
+
+        return TAMAGOTCHI_STATS.MAX_HUNGER; // 最後的預設值
     }
 }
