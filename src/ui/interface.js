@@ -416,8 +416,9 @@ class GameInterface {
             option.value = speed;
             option.textContent = `${speed}x`;
             
-            // 設定預設選項
-            if (speed === GAME_CONFIG.DEFAULT_TIME_SPEED) {
+            // 設定當前選項
+            const currentSpeed = this.timeSystem ? this.timeSystem.getTimeSpeed() : GAME_CONFIG.DEFAULT_TIME_SPEED;
+            if (speed === currentSpeed) {
                 option.selected = true;
             }
             
