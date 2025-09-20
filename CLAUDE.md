@@ -28,6 +28,7 @@ The codebase follows a modular class-based architecture with clear separation of
 - **`GameState`** (`src/core/gameState.js`) - State management with valid transitions (MENU → PLAYING → PAUSED/CONFIRM_RESET)
 - **`TimeSystem`** (`src/core/timeSystem.js`) - Handles game time flow, pause/resume, and speed adjustments
 - **`GameInterface`** (`src/ui/interface.js`) - UI controller that renders different game states and handles user interactions
+- **`LocalStorageService`** (`src/utils/localStorageService.js`) - Manages localStorage operations and data persistence
 
 ### Key Systems
 
@@ -47,7 +48,8 @@ src/
 │   └── interface.js # UI rendering and event handling
 └── utils/
     ├── constants.js # Game configuration constants
-    └── helpers.js   # Utility functions
+    ├── helpers.js   # Utility functions
+    └── localStorageService.js # localStorage management
 ```
 
 ## Important Implementation Details
@@ -90,3 +92,20 @@ All game constants are defined in `src/utils/constants.js`:
 - Monospace font family throughout
 - Error handling with try-catch and console logging
 - Event listener cleanup in state transitions
+
+## Data Persistence
+
+The game uses a sophisticated localStorage system through `LocalStorageService`:
+- Automatic data structure initialization with defaults
+- Incremental updates to specific data sections (tamagotchi, time, gameState, statistics)
+- Auto-save every 30 seconds during gameplay
+- Manual save on page visibility changes and beforeunload events
+- Game state restoration on page reload
+
+## Evolution System
+
+The game features a multi-stage evolution system defined in `PET_EVOLUTION` constants:
+- **EGG** → **BABY** → **ADULT** progression
+- Adult types include CHICKEN, PEACOCK, and PHOENIX
+- Each stage has different stat decay multipliers
+- Evolution triggered by age and stat thresholds
