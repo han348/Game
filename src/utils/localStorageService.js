@@ -44,15 +44,16 @@ class LocalStorageService {
                 happiness: TAMAGOTCHI_STATS.MAX_HAPPINESS,
                 health: TAMAGOTCHI_STATS.MAX_HEALTH,
                 cleanliness: TAMAGOTCHI_STATS.MAX_CLEANLINESS,
+                coins: TAMAGOTCHI_STATS.INITIAL_COINS,
                 isAlive: true,
                 isSleeping: false,
-                
+
                 // 進化系統
                 evolutionStage: PET_EVOLUTION.STAGES.EGG,
                 adultType: null, // 成年後的類型 (CHICKEN/PEACOCK/PHOENIX)
                 birthTime: Date.now(), // 出生時間
                 evolutionTime: 0, // 進化時間
-                
+
                 // 當前顯示的外型（用於測試按鈕）
                 currentAppearance: PET_EVOLUTION.STAGES.EGG
             },

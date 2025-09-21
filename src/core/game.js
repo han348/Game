@@ -13,6 +13,9 @@ class TamagotchiGame {
         this.currentHunger = null; // 稍後從 localStorage 載入或設為預設值
         this.lastHungerUpdate = 0;
         this.gameLoopInterval = null;
+
+        // 金幣相關屬性
+        this.currentCoins = null; // 稍後從 localStorage 載入或設為預設值
     }
     
     // 初始化遊戲
@@ -116,6 +119,9 @@ class TamagotchiGame {
         // 初始化飽食度 (從 localStorage 載入或設預設值)
         this.initializeHungerFromSave();
 
+        // 初始化金幣 (從 localStorage 載入或設預設值)
+        this.initializeCoinsFromSave();
+
         // 檢查是否需要初始化新的電子雞 (僅在首次遊戲時)
         if (!this.gameData.gameState.hasPlayedBefore) {
             this.initializeTamagotchi();
@@ -179,6 +185,7 @@ class TamagotchiGame {
             happiness: TAMAGOTCHI_STATS.MAX_HAPPINESS,
             health: TAMAGOTCHI_STATS.MAX_HEALTH,
             cleanliness: TAMAGOTCHI_STATS.MAX_CLEANLINESS,
+            coins: TAMAGOTCHI_STATS.INITIAL_COINS,
             isAlive: true,
             isSleeping: false,
 
@@ -228,6 +235,100 @@ class TamagotchiGame {
         console.log('電子雞狀態已重新初始化並保存:', this.gameData.tamagotchi);
     }
 
+    // 從儲存資料初始化金幣
+    initializeCoinsFromSave() {
+        if (this.currentCoins !== null) {
+            // 已經初始化過了
+            return;
+        }
+
+        // 嘗試從 localStorage 載入金幣
+        if (this.gameData && this.gameData.tamagotchi && this.gameData.tamagotchi.coins !== undefined) {
+            this.currentCoins = this.gameData.tamagotchi.coins;
+            console.log(`從儲存載入金幣: ${this.currentCoins}`);
+        } else {
+            // 沒有儲存資料，使用預設值
+            this.currentCoins = TAMAGOTCHI_STATS.INITIAL_COINS;
+            console.log(`使用預設金幣: ${this.currentCoins}`);
+        }
+    }
+
+    // 增加金幣
+    addCoins(amount) {
+        if (amount <= 0) {
+            console.warn('金幣增加數量必須大於0');
+            return false;
+        }
+
+        const oldCoins = this.currentCoins;
+        this.currentCoins = Math.min(TAMAGOTCHI_STATS.MAX_COINS, this.currentCoins + amount);
+        const actualIncrease = this.currentCoins - oldCoins;
+
+        console.log(`金幣增加: ${oldCoins} → ${this.currentCoins} (+${actualIncrease})`);
+
+        // 立即同步到 localStorage
+        this.updateTamagotchiData({ coins: this.currentCoins });
+
+        // 立即更新 UI
+        this.updateCoinsDisplay();
+
+        // 更新餵食按鈕狀態
+        if (this.gameInterface && this.gameInterface.updateFeedButtonState) {
+            this.gameInterface.updateFeedButtonState(this.currentCoins);
+        }
+
+        return {
+            success: true,
+            oldValue: oldCoins,
+            newValue: this.currentCoins,
+            increase: actualIncrease
+        };
+    }
+
+    // 消費金幣
+    spendCoins(amount) {
+        if (amount <= 0) {
+            console.warn('金幣消費數量必須大於0');
+            return false;
+        }
+
+        if (this.currentCoins < amount) {
+            console.warn(`金幣不足: 需要${amount}，目前${this.currentCoins}`);
+            return false;
+        }
+
+        const oldCoins = this.currentCoins;
+        this.currentCoins = Math.max(TAMAGOTCHI_STATS.MIN_COINS, this.currentCoins - amount);
+        const actualDecrease = oldCoins - this.currentCoins;
+
+        console.log(`金幣消費: ${oldCoins} → ${this.currentCoins} (-${actualDecrease})`);
+
+        // 立即同步到 localStorage
+        this.updateTamagotchiData({ coins: this.currentCoins });
+
+        // 立即更新 UI
+        this.updateCoinsDisplay();
+
+        // 更新餵食按鈕狀態
+        if (this.gameInterface && this.gameInterface.updateFeedButtonState) {
+            this.gameInterface.updateFeedButtonState(this.currentCoins);
+        }
+
+        return {
+            success: true,
+            oldValue: oldCoins,
+            newValue: this.currentCoins,
+            decrease: actualDecrease
+        };
+    }
+
+    // 更新金幣顯示
+    updateCoinsDisplay() {
+        if (this.gameInterface && this.gameInterface.updateCoinsDisplay) {
+            this.gameInterface.updateCoinsDisplay(Math.floor(this.currentCoins));
+        }
+    }
+
     // 更新飽食度
     updateHunger() {
         if (this.timeSystem.isPaused) return;
@@ -252,29 +353,59 @@ class TamagotchiGame {
 
     // 餵食功能
     feedPet() {
+        // 檢查金幣是否足夠
+        if (this.currentCoins < 1) {
+            console.warn('金幣不足，無法餵食');
+            return {
+                success: false,
+                reason: 'insufficient_coins',
+                message: '金幣不足，無法餵食',
+                currentCoins: this.currentCoins
+            };
+        }
+
         const feedAmount = 5; // 每次餵食增加5點
         const oldHunger = this.currentHunger;
+        const oldCoins = this.currentCoins;
 
         // 增加飽食度，但不超過最大值
         this.currentHunger = Math.min(TAMAGOTCHI_STATS.MAX_HUNGER, this.currentHunger + feedAmount);
 
-        const actualIncrease = this.currentHunger - oldHunger;
+        // 扣除1枚金幣
+        this.currentCoins = Math.max(TAMAGOTCHI_STATS.MIN_COINS, this.currentCoins - 1);
 
-        console.log(`餵食完成: ${Math.floor(oldHunger)} → ${Math.floor(this.currentHunger)} (+${actualIncrease.toFixed(1)})`);
+        const actualHungerIncrease = this.currentHunger - oldHunger;
+        const coinsSpent = oldCoins - this.currentCoins;
+
+        console.log(`餵食完成: 飽食度 ${Math.floor(oldHunger)} → ${Math.floor(this.currentHunger)} (+${actualHungerIncrease.toFixed(1)}), 金幣 ${oldCoins} → ${this.currentCoins} (-${coinsSpent})`);
 
         // 立即同步到 localStorage
-        this.updateTamagotchiData({ hunger: this.currentHunger });
+        this.updateTamagotchiData({
+            hunger: this.currentHunger,
+            coins: this.currentCoins
+        });
 
         // 立即更新 UI
         if (this.gameInterface && this.gameInterface.updateHungerDisplay) {
             this.gameInterface.updateHungerDisplay(Math.floor(this.currentHunger));
         }
+        if (this.gameInterface && this.gameInterface.updateCoinsDisplay) {
+            this.gameInterface.updateCoinsDisplay(Math.floor(this.currentCoins));
+        }
+
+        // 更新餵食按鈕狀態
+        if (this.gameInterface && this.gameInterface.updateFeedButtonState) {
+            this.gameInterface.updateFeedButtonState(this.currentCoins);
+        }
 
         return {
             success: true,
-            oldValue: Math.floor(oldHunger),
-            newValue: Math.floor(this.currentHunger),
-            increase: actualIncrease
+            oldHungerValue: Math.floor(oldHunger),
+            newHungerValue: Math.floor(this.currentHunger),
+            hungerIncrease: actualHungerIncrease,
+            oldCoinsValue: oldCoins,
+            newCoinsValue: this.currentCoins,
+            coinsSpent: coinsSpent
         };
     }
 
@@ -295,11 +426,17 @@ class TamagotchiGame {
                 this.updateHunger();
 
                 // 同步到 localStorage
-                this.updateTamagotchiData({ hunger: this.currentHunger });
+                this.updateTamagotchiData({
+                    hunger: this.currentHunger,
+                    coins: this.currentCoins
+                });
 
                 // 更新 UI 顯示
                 if (this.gameInterface && this.gameInterface.updateHungerDisplay) {
                     this.gameInterface.updateHungerDisplay(Math.floor(this.currentHunger));
+                }
+                if (this.gameInterface && this.gameInterface.updateCoinsDisplay) {
+                    this.gameInterface.updateCoinsDisplay(Math.floor(this.currentCoins));
                 }
             }
         }, 1000); // 每秒更新
@@ -592,4 +729,73 @@ document.addEventListener('DOMContentLoaded', () => {
 // 供外部存取遊戲實例
 function getGameInstance() {
     return gameInstance;
+}
+
+// 測試金幣系統的輔助函數 (用於驗證功能)
+function testCoinSystem() {
+    const game = getGameInstance();
+    if (!game) {
+        console.error('遊戲實例不存在');
+        return false;
+    }
+
+    console.log('=== 金幣系統測試開始 ===');
+
+    // 測試初始金幣
+    console.log(`當前金幣: ${game.currentCoins}`);
+
+    // 測試增加金幣
+    const addResult = game.addCoins(50);
+    console.log('增加50金幣結果:', addResult);
+
+    // 測試消費金幣
+    const spendResult = game.spendCoins(25);
+    console.log('消費25金幣結果:', spendResult);
+
+    // 測試消費超額金幣
+    const overspendResult = game.spendCoins(999999);
+    console.log('嘗試消費過多金幣結果:', overspendResult);
+
+    console.log(`測試後金幣: ${game.currentCoins}`);
+    console.log('=== 金幣系統測試完成 ===');
+
+    return true;
+}
+
+// 測試餵食成本系統的輔助函數
+function testFeedingCost() {
+    const game = getGameInstance();
+    if (!game) {
+        console.error('遊戲實例不存在');
+        return false;
+    }
+
+    console.log('=== 餵食成本系統測試開始 ===');
+
+    // 顯示初始狀態
+    console.log(`初始狀態 - 金幣: ${game.currentCoins}, 飽食度: ${Math.floor(game.currentHunger)}`);
+
+    // 測試正常餵食
+    let feedResult = game.feedPet();
+    console.log('第一次餵食結果:', feedResult);
+
+    // 清空金幣來測試無法餵食
+    game.currentCoins = 0;
+    game.updateCoinsDisplay();
+    console.log('金幣清空後嘗試餵食...');
+
+    feedResult = game.feedPet();
+    console.log('金幣不足時餵食結果:', feedResult);
+
+    // 恢復一些金幣繼續測試
+    game.addCoins(5);
+    console.log('恢復5金幣後再次嘗試餵食...');
+
+    feedResult = game.feedPet();
+    console.log('恢復金幣後餵食結果:', feedResult);
+
+    console.log(`最終狀態 - 金幣: ${game.currentCoins}, 飽食度: ${Math.floor(game.currentHunger)}`);
+    console.log('=== 餵食成本系統測試完成 ===');
+
+    return true;
 }

@@ -292,17 +292,26 @@ class GameInterface {
 
         // 動態狀態顯示
         const currentHunger = this.getCurrentHunger();
+        const currentCoins = this.getCurrentCoins();
         const stats = [
+            `金幣: ${currentCoins}`,
             `飽食度: ${currentHunger}`,
             '快樂: 90',
             '健康: 85',
             '清潔: 75'
         ];
 
-        stats.forEach(stat => {
+        stats.forEach((stat, index) => {
             const statusItem = document.createElement('div');
             statusItem.className = 'status-item';
-            statusItem.innerHTML = `<span class="status-value">${stat}</span>`;
+
+            // 為金幣添加特殊樣式
+            if (index === 0) { // 金幣是第一個項目
+                statusItem.innerHTML = `<span class="status-value" style="color: #FFD700; font-weight: bold;">${stat}</span>`;
+            } else {
+                statusItem.innerHTML = `<span class="status-value">${stat}</span>`;
+            }
+
             statusBar.appendChild(statusItem);
         });
 
@@ -316,15 +325,7 @@ class GameInterface {
         actionContainer.style.marginTop = '10px';
         
         // 照顧按鈕
-        const feedButton = this.createButton('餵食', () => {
-            const gameInstance = getGameInstance();
-            if (gameInstance && gameInstance.feedPet) {
-                const result = gameInstance.feedPet();
-                console.log('餵食結果:', result);
-            } else {
-                console.log('遊戲實例未找到');
-            }
-        });
+        const feedButton = this.createFeedButton();
         
         const playButton = this.createButton('遊戲', () => {
             console.log('遊戲');
@@ -340,6 +341,9 @@ class GameInterface {
         });
         encyclopediaButton.style.backgroundColor = '#6644aa';
         
+        // 儲存餵食按鈕引用供後續更新使用
+        this.feedButton = feedButton;
+
         [feedButton, playButton, cleanButton, encyclopediaButton].forEach(button => {
             actionContainer.appendChild(button);
         });
@@ -401,6 +405,60 @@ class GameInterface {
         button.className = 'game-button';
         button.addEventListener('click', onClick);
         return button;
+    }
+
+    // 建立餵食按鈕（帶金幣檢查）
+    createFeedButton() {
+        const gameInstance = getGameInstance();
+        const currentCoins = gameInstance ? gameInstance.currentCoins || 0 : 0;
+
+        const button = document.createElement('button');
+        button.className = 'game-button';
+
+        // 設定按鈕文字和狀態
+        this.updateFeedButtonAppearance(button, currentCoins);
+
+        button.addEventListener('click', () => {
+            const gameInstance = getGameInstance();
+            if (gameInstance && gameInstance.feedPet) {
+                const result = gameInstance.feedPet();
+                console.log('餵食結果:', result);
+
+                // 如果餵食失敗且是因為金幣不足，顯示提示
+                if (!result.success && result.reason === 'insufficient_coins') {
+                    // 可以在這裡添加視覺提示，例如按鈕閃爍等
+                    console.warn(result.message);
+                }
+            } else {
+                console.log('遊戲實例未找到');
+            }
+        });
+
+        return button;
+    }
+
+    // 更新餵食按鈕外觀
+    updateFeedButtonAppearance(button, coins) {
+        if (coins >= 1) {
+            button.textContent = '餵食 (1💰)';
+            button.disabled = false;
+            button.style.backgroundColor = '#4CAF50'; // 綠色表示可用
+            button.style.opacity = '1';
+            button.style.cursor = 'pointer';
+        } else {
+            button.textContent = '餵食 (無金幣)';
+            button.disabled = true;
+            button.style.backgroundColor = '#666666'; // 灰色表示禁用
+            button.style.opacity = '0.6';
+            button.style.cursor = 'not-allowed';
+        }
+    }
+
+    // 更新餵食按鈕狀態（供遊戲實例調用）
+    updateFeedButtonState(coins) {
+        if (this.feedButton) {
+            this.updateFeedButtonAppearance(this.feedButton, coins);
+        }
     }
     
     // 建立時間流速選擇器
@@ -1148,9 +1206,20 @@ class GameInterface {
     // 更新飽食度顯示
     updateHungerDisplay(hungerValue) {
         const statusItems = document.querySelectorAll('.status-item');
-        if (statusItems && statusItems[0]) {
-            statusItems[0].innerHTML = `<span class="status-value">飽食度: ${hungerValue}</span>`;
+        if (statusItems && statusItems[1]) { // 飽食度現在是第二個項目
+            statusItems[1].innerHTML = `<span class="status-value">飽食度: ${hungerValue}</span>`;
         }
+    }
+
+    // 更新金幣顯示
+    updateCoinsDisplay(coinsValue) {
+        const statusItems = document.querySelectorAll('.status-item');
+        if (statusItems && statusItems[0]) { // 金幣是第一個項目
+            statusItems[0].innerHTML = `<span class="status-value" style="color: #FFD700; font-weight: bold;">金幣: ${coinsValue}</span>`;
+        }
+
+        // 同時更新餵食按鈕狀態
+        this.updateFeedButtonState(coinsValue);
     }
 
     // 獲取當前飽食度 (供UI初始化使用)
@@ -1166,5 +1235,20 @@ class GameInterface {
         }
 
         return TAMAGOTCHI_STATS.MAX_HUNGER; // 最後的預設值
+    }
+
+    // 獲取當前金幣 (供UI初始化使用)
+    getCurrentCoins() {
+        const gameInstance = getGameInstance();
+        if (gameInstance && gameInstance.currentCoins !== null && gameInstance.currentCoins !== undefined) {
+            return Math.floor(gameInstance.currentCoins);
+        }
+
+        // 如果金幣尚未初始化，檢查是否有儲存資料
+        if (gameInstance && gameInstance.gameData && gameInstance.gameData.tamagotchi && gameInstance.gameData.tamagotchi.coins !== undefined) {
+            return Math.floor(gameInstance.gameData.tamagotchi.coins);
+        }
+
+        return TAMAGOTCHI_STATS.INITIAL_COINS; // 最後的預設值
     }
 }

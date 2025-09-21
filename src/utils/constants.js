@@ -24,16 +24,21 @@ const TAMAGOTCHI_STATS = {
     MAX_HAPPINESS: 100,
     MAX_HEALTH: 100,
     MAX_CLEANLINESS: 100,
-    
+
     // 屬性衰減速度 (每分鐘)
     HUNGER_DECAY: 2,
     HAPPINESS_DECAY: 1,
     HEALTH_DECAY: 0.5,
     CLEANLINESS_DECAY: 1.5,
-    
+
     // 危險閾值
     CRITICAL_THRESHOLD: 20,
-    WARNING_THRESHOLD: 40
+    WARNING_THRESHOLD: 40,
+
+    // 金幣系統
+    INITIAL_COINS: 100,
+    MIN_COINS: 0,
+    MAX_COINS: 9999
 };
 
 const SPRITE_CONFIG = {
