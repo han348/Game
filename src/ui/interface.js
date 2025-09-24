@@ -1009,16 +1009,21 @@ class GameInterface {
     }
     
     performReset() {
-        // 重置時間系統
-        if (this.timeSystem) {
-            this.timeSystem.reset();
+        // 調用遊戲實例的重置函數
+        const gameInstance = getGameInstance();
+        if (gameInstance && gameInstance.resetGame) {
+            gameInstance.resetGame();
+        } else {
+            // 備用方案：直接重置
+            if (this.timeSystem) {
+                this.timeSystem.reset();
+            }
+
+            if (GAME_CONFIG.SAVE_KEY) {
+                localStorage.removeItem(GAME_CONFIG.SAVE_KEY);
+            }
         }
-        
-        // 清除本地存檔
-        if (GAME_CONFIG.SAVE_KEY) {
-            localStorage.removeItem(GAME_CONFIG.SAVE_KEY);
-        }
-        
+
         console.log('遊戲已完全重置');
     }
     

@@ -644,7 +644,13 @@ class TamagotchiGame {
     // 重置遊戲 (確認後執行)
     resetGame() {
         console.log('執行遊戲重置');
-        
+
+        // 清除遊戲循環定時器
+        if (this.gameLoopInterval) {
+            clearInterval(this.gameLoopInterval);
+            this.gameLoopInterval = null;
+        }
+
         // 使用 LocalStorageService 重置資料
         if (this.localStorageService) {
             this.localStorageService.resetGameData();
@@ -655,14 +661,37 @@ class TamagotchiGame {
                 localStorage.removeItem(GAME_CONFIG.SAVE_KEY);
             }
         }
-        
+
+        // 重置記憶體中的遊戲變數
+        this.currentHunger = TAMAGOTCHI_STATS.MAX_HUNGER;
+        this.currentCoins = TAMAGOTCHI_STATS.INITIAL_COINS;
+        this.lastHungerUpdate = 0;
+
         // 重置時間系統
         this.timeSystem.reset();
-        
+
         // 重置遊戲狀態
         this.gameState.reset();
-        
-        console.log('遊戲已重置');
+
+        // 立即更新 UI 顯示
+        if (this.gameInterface) {
+            // 延遲更新 UI 以確保狀態變更完成
+            setTimeout(() => {
+                if (this.gameInterface.updateHungerDisplay) {
+                    this.gameInterface.updateHungerDisplay(Math.floor(this.currentHunger));
+                }
+                if (this.gameInterface.updateCoinsDisplay) {
+                    this.gameInterface.updateCoinsDisplay(Math.floor(this.currentCoins));
+                }
+                if (this.gameInterface.updateFeedButtonState) {
+                    this.gameInterface.updateFeedButtonState(this.currentCoins);
+                }
+                // 觸發完整 UI 更新
+                this.gameInterface.updateUI(this.gameState.getCurrentState());
+            }, 0);
+        }
+
+        console.log(`遊戲已重置 - 金錢: ${this.currentCoins}, 飽食度: ${Math.floor(this.currentHunger)}`);
     }
     
     // 更新電子雞資料
