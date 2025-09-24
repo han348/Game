@@ -82,7 +82,8 @@ The game uses a finite state machine with these states:
 All game constants are defined in `src/utils/constants.js`:
 - Canvas dimensions (320x240)
 - Time system settings (speed limits, update intervals)
-- Tamagotchi stats (hunger decay rates, thresholds)
+- Tamagotchi stats (hunger decay rates, thresholds, coin limits)
+- Pet evolution system configuration
 - Save key for localStorage
 
 ## Code Style Notes
@@ -97,7 +98,8 @@ All game constants are defined in `src/utils/constants.js`:
 
 ### Functional Features
 - **Hunger System**: Fully implemented with time-based decay (2 points/minute)
-- **Feeding Mechanism**: Players can feed pet to increase hunger by 5 points
+- **Feeding Mechanism**: Players can feed pet to increase hunger by 5 points (costs 1 coin)
+- **Coin System**: Complete economy system with earning/spending mechanics (100 initial coins, max 9999)
 - **Time Management**: Adjustable speed (0.1x to 16x) with pause/resume functionality
 - **Save/Load System**: Complete localStorage integration with automatic sync
 - **UI State Management**: Proper initialization order prevents display issues
@@ -105,14 +107,17 @@ All game constants are defined in `src/utils/constants.js`:
 ### Game Loop Architecture
 The game uses a 1-second update cycle that:
 1. Updates hunger based on elapsed time and speed multiplier
-2. Syncs data to localStorage
-3. Updates UI displays in real-time
-4. Handles state transitions properly
+2. Updates coin display and feeding button state
+3. Syncs data to localStorage
+4. Updates UI displays in real-time
+5. Handles state transitions properly
 
 ### Critical Implementation Details
 - **Initialization Order**: UI rendering is delayed until after localStorage data is loaded to prevent displaying incorrect default values
-- **State Restoration**: Game correctly restores hunger values and time system state after page refresh
+- **State Restoration**: Game correctly restores hunger values, coin amounts, and time system state after page refresh
 - **Event Handling**: Uses setTimeout(0) for state change UI updates to ensure proper execution order
+- **Economy System**: Feeding requires coins (1 per feeding), with proper validation and UI feedback for insufficient funds
+- **Test Functions**: Built-in test functions (`testCoinSystem()`, `testFeedingCost()`) available in browser console for debugging
 
 ### Planned Features (from requirements.md)
 - Life/Health system with death mechanics
