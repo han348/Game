@@ -193,7 +193,8 @@ class TamagotchiGame {
             evolutionStage: PET_EVOLUTION.STAGES.EGG,
             adultType: null,
             birthTime: currentTime,
-            evolutionTime: 0,
+            lastEvolutionTime: currentTime,
+            lastEvolutionGameTime: 0, // 遊戲時間從0開始
 
             // 當前顯示的外型
             currentAppearance: PET_EVOLUTION.STAGES.EGG
@@ -351,6 +352,97 @@ class TamagotchiGame {
         console.log(`飽食度更新: ${Math.floor(this.currentHunger)} (衰減: ${decay.toFixed(2)})`);
     }
 
+    // 檢查進化條件
+    checkEvolutionConditions() {
+        if (!this.gameData || !this.gameData.tamagotchi || this.timeSystem.isPaused) {
+            return false;
+        }
+
+        const tamagotchi = this.gameData.tamagotchi;
+        const currentStage = tamagotchi.evolutionStage;
+
+        // 計算自上次進化後的遊戲時間（以秒為單位）
+        const currentGameTime = this.timeSystem.getGameTime();
+        const timeSinceLastEvolutionSeconds = currentGameTime - (tamagotchi.lastEvolutionGameTime || 0);
+        const timeSinceLastEvolutionMs = timeSinceLastEvolutionSeconds * 1000;
+
+        // 檢查蛋 → 小雞的進化條件
+        if (currentStage === PET_EVOLUTION.STAGES.EGG) {
+            if (timeSinceLastEvolutionMs >= PET_EVOLUTION.EVOLUTION_CONDITIONS.EGG_TO_BABY.minTime) {
+                console.log(`進化條件達成：蛋 → 小雞 (遊戲時間: ${Math.floor(timeSinceLastEvolutionSeconds / 60)}分鐘)`);
+                this.evolveToNextStage(PET_EVOLUTION.STAGES.BABY);
+                return true;
+            }
+        }
+        // 檢查小雞 → 成年體的進化條件
+        else if (currentStage === PET_EVOLUTION.STAGES.BABY) {
+            if (timeSinceLastEvolutionMs >= PET_EVOLUTION.EVOLUTION_CONDITIONS.BABY_TO_ADULT.minTime) {
+                console.log(`進化條件達成：小雞 → 成年體 (遊戲時間: ${Math.floor(timeSinceLastEvolutionSeconds / 60)}分鐘)`);
+                const adultType = this.determineAdultType();
+                this.evolveToNextStage(PET_EVOLUTION.STAGES.ADULT, adultType);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // 決定成年體類型 (根據機率)
+    determineAdultType() {
+        const random = Math.random();
+        const rates = PET_EVOLUTION.ADULT_EVOLUTION_RATES;
+
+        if (random < rates.PHOENIX) {
+            // 0-10%: 鳳凰
+            return PET_EVOLUTION.ADULT_TYPES.PHOENIX;
+        } else if (random < rates.PHOENIX + rates.PEACOCK) {
+            // 10-40%: 孔雀
+            return PET_EVOLUTION.ADULT_TYPES.PEACOCK;
+        } else {
+            // 40-100%: 雞
+            return PET_EVOLUTION.ADULT_TYPES.CHICKEN;
+        }
+    }
+
+    // 執行進化到下一階段
+    evolveToNextStage(newStage, adultType = null) {
+        const currentGameTime = this.timeSystem.getGameTime();
+
+        const evolutionUpdate = {
+            evolutionStage: newStage,
+            lastEvolutionTime: Date.now(), // 保留真實時間作為參考
+            lastEvolutionGameTime: currentGameTime, // 新增遊戲時間記錄
+            currentAppearance: adultType || newStage
+        };
+
+        // 如果是進化到成年體，設定成年體類型
+        if (newStage === PET_EVOLUTION.STAGES.ADULT && adultType) {
+            evolutionUpdate.adultType = adultType;
+        }
+
+        // 更新電子雞資料
+        this.updateTamagotchiData(evolutionUpdate);
+
+        // 重新載入遊戲資料
+        this.gameData = this.localStorageService.getData();
+
+        // 觸發進化事件
+        this.onPetEvolved(newStage, adultType);
+
+        console.log(`進化完成：${newStage}${adultType ? ` (${adultType})` : ''}`);
+    }
+
+    // 進化事件處理 (可以在這裡添加進化動畫、音效等)
+    onPetEvolved(newStage, adultType = null) {
+        // 更新 UI 顯示
+        if (this.gameInterface && this.gameInterface.updateEvolutionDisplay) {
+            this.gameInterface.updateEvolutionDisplay(newStage, adultType);
+        }
+
+        // 可以在這裡添加進化慶祝效果
+        console.log(`🎉 進化成功！現在是 ${newStage}${adultType ? ` (${adultType})` : ''}`);
+    }
+
     // 餵食功能
     feedPet() {
         // 檢查金幣是否足夠
@@ -424,6 +516,9 @@ class TamagotchiGame {
             if (this.gameState.isState(GameState.STATES.PLAYING)) {
                 // 更新飽食度
                 this.updateHunger();
+
+                // 檢查進化條件
+                this.checkEvolutionConditions();
 
                 // 同步到 localStorage
                 this.updateTamagotchiData({
@@ -827,4 +922,91 @@ function testFeedingCost() {
     console.log('=== 餵食成本系統測試完成 ===');
 
     return true;
+}
+
+// 測試進化系統的輔助函數
+function testEvolutionSystem() {
+    const game = getGameInstance();
+    if (!game) {
+        console.error('遊戲實例不存在');
+        return false;
+    }
+
+    console.log('=== 進化系統測試開始 ===');
+
+    // 顯示目前狀態
+    const currentData = game.gameData.tamagotchi;
+    console.log(`目前狀態:`, {
+        進化階段: currentData.evolutionStage,
+        成年體類型: currentData.adultType,
+        出生時間: new Date(currentData.birthTime).toLocaleString(),
+        上次進化時間: new Date(currentData.lastEvolutionTime).toLocaleString(),
+        時間倍速: game.timeSystem.timeSpeed
+    });
+
+    // 計算進化倒數
+    const currentGameTime = game.timeSystem.getGameTime();
+    const timeSinceLastEvolutionSeconds = currentGameTime - (currentData.lastEvolutionGameTime || 0);
+    const timeSinceLastEvolution = timeSinceLastEvolutionSeconds * 1000;
+
+    if (currentData.evolutionStage === PET_EVOLUTION.STAGES.EGG) {
+        const timeRemaining = PET_EVOLUTION.EVOLUTION_CONDITIONS.EGG_TO_BABY.minTime - timeSinceLastEvolution;
+        console.log(`蛋 → 小雞進化倒數: ${Math.max(0, Math.floor(timeRemaining / 1000 / 60))}分${Math.max(0, Math.floor((timeRemaining / 1000) % 60))}秒`);
+    } else if (currentData.evolutionStage === PET_EVOLUTION.STAGES.BABY) {
+        const timeRemaining = PET_EVOLUTION.EVOLUTION_CONDITIONS.BABY_TO_ADULT.minTime - timeSinceLastEvolution;
+        console.log(`小雞 → 成年體進化倒數: ${Math.max(0, Math.floor(timeRemaining / 1000 / 60))}分${Math.max(0, Math.floor((timeRemaining / 1000) % 60))}秒`);
+    } else {
+        console.log('已經是成年體，無法再進化');
+    }
+
+    // 手動觸發進化檢查
+    console.log('手動觸發進化檢查...');
+    const evolutionResult = game.checkEvolutionConditions();
+    console.log('進化檢查結果:', evolutionResult);
+
+    console.log('=== 進化系統測試完成 ===');
+    return true;
+}
+
+// 強制進化測試 (僅用於開發測試)
+function forceEvolution(targetStage = null) {
+    const game = getGameInstance();
+    if (!game) {
+        console.error('遊戲實例不存在');
+        return false;
+    }
+
+    console.log('=== 強制進化測試 ===');
+
+    const currentData = game.gameData.tamagotchi;
+    console.log(`目前階段: ${currentData.evolutionStage}`);
+
+    if (!targetStage) {
+        // 自動決定下一個階段
+        if (currentData.evolutionStage === PET_EVOLUTION.STAGES.EGG) {
+            targetStage = PET_EVOLUTION.STAGES.BABY;
+        } else if (currentData.evolutionStage === PET_EVOLUTION.STAGES.BABY) {
+            targetStage = PET_EVOLUTION.STAGES.ADULT;
+        } else {
+            console.log('已經是成年體，無法進化');
+            return false;
+        }
+    }
+
+    // 強制設定進化時間為已達成
+    const forceEvolutionTime = Date.now() - (100 * 60 * 1000); // 100分鐘前
+    const forceGameTime = game.timeSystem.getGameTime() - (100 * 60); // 遊戲時間100分鐘前
+    game.updateTamagotchiData({
+        lastEvolutionTime: forceEvolutionTime,
+        lastEvolutionGameTime: forceGameTime
+    });
+    game.gameData = game.localStorageService.getData();
+
+    console.log('強制設定進化時間為已達成，觸發進化檢查...');
+    const result = game.checkEvolutionConditions();
+
+    console.log('強制進化結果:', result);
+    console.log('=== 強制進化測試完成 ===');
+
+    return result;
 }

@@ -150,12 +150,12 @@ class GameInterface {
             }
         }
         
-        // 顯示電子雞（根據當前外型）
-        this.drawCurrentPet(this.canvas.width / 2 - 16, 120);
-        
+        // 顯示電子雞（根據當前外型和進化階段）
+        this.drawCurrentPetWithEvolution();
+
         // 狀態列
         this.renderStatusBar();
-        
+
         // 控制按鈕
         this.renderControlButtons();
     }
@@ -467,7 +467,7 @@ class GameInterface {
         select.className = 'time-speed-select';
         
         // 時間流速選項
-        const speedOptions = [1, 2, 4, 8, 16];
+        const speedOptions = [1, 2, 4, 8, 16, 300];
         
         speedOptions.forEach(speed => {
             const option = document.createElement('option');
@@ -1255,5 +1255,69 @@ class GameInterface {
         }
 
         return TAMAGOTCHI_STATS.INITIAL_COINS; // 最後的預設值
+    }
+
+    // 更新進化階段顯示 (僅更新寵物外觀，不顯示文字)
+    updateEvolutionDisplay(newStage, adultType = null) {
+        // 僅更新畫布上的寵物外觀
+        this.updatePetAppearance(newStage, adultType);
+    }
+
+
+    // 更新畫布上的寵物外觀 (使用點陣圖風格)
+    updatePetAppearance(stage, adultType = null) {
+        // 計算寵物繪製位置 (與現有的 drawCurrentPet 方法保持一致)
+        const petX = this.canvas.width / 2 - 16;
+        const petY = 120;
+
+        // 先清除寵物區域，確保進化時不會有殘影
+        this.clearPetArea(petX - 15, petY - 15, 70, 50);
+
+        // 根據進化階段繪製對應的點陣圖寵物
+        switch (stage) {
+            case PET_EVOLUTION.STAGES.EGG:
+                this.drawPetByType(PET_EVOLUTION.STAGES.EGG, petX, petY);
+                break;
+            case PET_EVOLUTION.STAGES.BABY:
+                this.drawPetByType(PET_EVOLUTION.STAGES.BABY, petX, petY);
+                break;
+            case PET_EVOLUTION.STAGES.ADULT:
+                if (adultType === PET_EVOLUTION.ADULT_TYPES.CHICKEN) {
+                    this.drawPetByType(PET_EVOLUTION.ADULT_TYPES.CHICKEN, petX, petY);
+                } else if (adultType === PET_EVOLUTION.ADULT_TYPES.PEACOCK) {
+                    this.drawPetByType(PET_EVOLUTION.ADULT_TYPES.PEACOCK, petX, petY);
+                } else if (adultType === PET_EVOLUTION.ADULT_TYPES.PHOENIX) {
+                    this.drawPetByType(PET_EVOLUTION.ADULT_TYPES.PHOENIX, petX, petY);
+                }
+                break;
+        }
+    }
+
+
+    // 獲取當前寵物的進化資訊 (供UI顯示使用)
+    getCurrentEvolutionInfo() {
+        const gameInstance = getGameInstance();
+        if (gameInstance && gameInstance.gameData && gameInstance.gameData.tamagotchi) {
+            const tamagotchi = gameInstance.gameData.tamagotchi;
+            return {
+                stage: tamagotchi.evolutionStage,
+                adultType: tamagotchi.adultType,
+                lastEvolutionTime: tamagotchi.lastEvolutionTime,
+                birthTime: tamagotchi.birthTime
+            };
+        }
+        return null;
+    }
+
+    // 根據進化階段繪製當前寵物
+    drawCurrentPetWithEvolution() {
+        const evolutionInfo = this.getCurrentEvolutionInfo();
+        if (evolutionInfo) {
+            // 使用進化階段來繪製寵物 (僅點陣圖，無文字)
+            this.updatePetAppearance(evolutionInfo.stage, evolutionInfo.adultType);
+        } else {
+            // 如果沒有進化資訊，顯示預設的蛋階段
+            this.updatePetAppearance(PET_EVOLUTION.STAGES.EGG);
+        }
     }
 }

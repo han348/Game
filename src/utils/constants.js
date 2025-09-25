@@ -8,7 +8,7 @@ const GAME_CONFIG = {
     // 時間設定
     DEFAULT_TIME_SPEED: 1.0,
     MIN_TIME_SPEED: 0.1,
-    MAX_TIME_SPEED: 16.0,
+    MAX_TIME_SPEED: 300.0,
     
     // 更新頻率 (毫秒)
     UPDATE_INTERVAL: 1000, // 每秒更新一次狀態
@@ -72,16 +72,21 @@ const PET_EVOLUTION = {
         PHOENIX: 'PHOENIX'    // 鳳凰
     },
     
-    // 進化條件
+    // 進化條件 (基於遊戲時間，單位：毫秒)
     EVOLUTION_CONDITIONS: {
         EGG_TO_BABY: {
-            minAge: 1,        // 1天後孵化
-            minAffection: 50
+            minTime: 30 * 60 * 1000,    // 30分鐘 = 1,800,000毫秒
         },
         BABY_TO_ADULT: {
-            minAge: 7,        // 7天後成年
-            minLevel: 5
+            minTime: 60 * 60 * 1000,    // 1小時 = 3,600,000毫秒
         }
+    },
+
+    // 成年體進化機率
+    ADULT_EVOLUTION_RATES: {
+        CHICKEN: 0.60,    // 60%
+        PEACOCK: 0.30,    // 30%
+        PHOENIX: 0.10     // 10%
     },
     
     // 各形態的基本屬性倍率

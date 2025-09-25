@@ -4,7 +4,6 @@
       "Bash(python3:*)"
     ]
   },
-  "outputStyle": "default",
   "hooks": {
     "PostToolUse": [
       {
@@ -16,6 +15,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_user",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "say 'Hello'"
+          }
+        ]
+      }
     ]
-  }
+  },
+  "outputStyle": "default"
 }

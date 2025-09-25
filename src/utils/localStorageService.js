@@ -52,7 +52,8 @@ class LocalStorageService {
                 evolutionStage: PET_EVOLUTION.STAGES.EGG,
                 adultType: null, // 成年後的類型 (CHICKEN/PEACOCK/PHOENIX)
                 birthTime: Date.now(), // 出生時間
-                evolutionTime: 0, // 進化時間
+                lastEvolutionTime: Date.now(), // 上次進化時間（真實時間）
+                lastEvolutionGameTime: 0, // 上次進化遊戲時間（遊戲秒數）
 
                 // 當前顯示的外型（用於測試按鈕）
                 currentAppearance: PET_EVOLUTION.STAGES.EGG
