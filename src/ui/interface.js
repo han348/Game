@@ -297,8 +297,7 @@ class GameInterface {
             `金幣: ${currentCoins}`,
             `飽食度: ${currentHunger}`,
             '好感度: 90',
-            '健康: 85',
-            '清潔: 75'
+            '生命值: 85'
         ];
 
         stats.forEach((stat, index) => {
@@ -331,9 +330,6 @@ class GameInterface {
             console.log('遊戲');
         });
         
-        const cleanButton = this.createButton('清潔', () => {
-            console.log('清潔');
-        });
         
         // 寵物圖鑑按鈕
         const encyclopediaButton = this.createButton('寵物圖鑑', () => {
@@ -344,7 +340,7 @@ class GameInterface {
         // 儲存餵食按鈕引用供後續更新使用
         this.feedButton = feedButton;
 
-        [feedButton, playButton, cleanButton, encyclopediaButton].forEach(button => {
+        [feedButton, playButton, encyclopediaButton].forEach(button => {
             actionContainer.appendChild(button);
         });
         

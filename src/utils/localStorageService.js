@@ -42,8 +42,7 @@ class LocalStorageService {
                 age: 0,
                 hunger: TAMAGOTCHI_STATS.MAX_HUNGER,
                 affection: TAMAGOTCHI_STATS.MAX_AFFECTION,
-                health: TAMAGOTCHI_STATS.MAX_HEALTH,
-                cleanliness: TAMAGOTCHI_STATS.MAX_CLEANLINESS,
+                life: TAMAGOTCHI_STATS.MAX_LIFE,
                 coins: TAMAGOTCHI_STATS.INITIAL_COINS,
                 isAlive: true,
                 isSleeping: false,
@@ -88,7 +87,6 @@ class LocalStorageService {
                 totalPlayTime: 0,
                 feedCount: 0,
                 playCount: 0,
-                cleanCount: 0,
                 medicineCount: 0,
                 gamesPlayed: 0,
                 maxLevel: 1

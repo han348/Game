@@ -22,14 +22,12 @@ const TAMAGOTCHI_STATS = {
     // 屬性範圍
     MAX_HUNGER: 100,
     MAX_AFFECTION: 100,
-    MAX_HEALTH: 100,
-    MAX_CLEANLINESS: 100,
+    MAX_LIFE: 100,
 
     // 屬性衰減速度 (每分鐘)
     HUNGER_DECAY: 2,
     AFFECTION_DECAY: 1,
-    HEALTH_DECAY: 0.5,
-    CLEANLINESS_DECAY: 1.5,
+    LIFE_DECAY: 0.5,
 
     // 危險閾值
     CRITICAL_THRESHOLD: 20,
@@ -52,7 +50,6 @@ const SPRITE_CONFIG = {
         HAPPY: 1,
         HUNGRY: 2,
         SICK: 3,
-        DIRTY: 4,
         SLEEPING: 5
     }
 };
@@ -94,20 +91,17 @@ const PET_EVOLUTION = {
         EGG: {
             hungerDecay: 0.5,    // 蛋階段餓得較慢
             affectionDecay: 0.3,
-            healthDecay: 0.2,
-            cleanlinessDecay: 0.1
+            lifeDecay: 0.2
         },
         BABY: {
             hungerDecay: 1.5,    // 幼年體餓得較快
             affectionDecay: 1.2,
-            healthDecay: 0.8,
-            cleanlinessDecay: 1.0
+            lifeDecay: 0.8
         },
         ADULT: {
             hungerDecay: 1.0,    // 成年體標準速度
             affectionDecay: 1.0,
-            healthDecay: 1.0,
-            cleanlinessDecay: 1.0
+            lifeDecay: 1.0
         }
     }
 };
