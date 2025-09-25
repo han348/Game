@@ -16,6 +16,10 @@ class TamagotchiGame {
 
         // 金幣相關屬性
         this.currentCoins = null; // 稍後從 localStorage 載入或設為預設值
+
+        // 生命值相關屬性
+        this.currentLife = null; // 稍後從 localStorage 載入或設為預設值
+        this.lastLifeUpdate = 0;
     }
     
     // 初始化遊戲
@@ -122,6 +126,9 @@ class TamagotchiGame {
         // 初始化金幣 (從 localStorage 載入或設預設值)
         this.initializeCoinsFromSave();
 
+        // 初始化生命值 (從 localStorage 載入或設預設值)
+        this.initializeLifeFromSave();
+
         // 檢查是否需要初始化新的電子雞 (僅在首次遊戲時)
         if (!this.gameData.gameState.hasPlayedBefore) {
             this.initializeTamagotchi();
@@ -167,6 +174,24 @@ class TamagotchiGame {
             // 沒有儲存資料，使用預設值
             this.currentHunger = TAMAGOTCHI_STATS.MAX_HUNGER;
             console.log(`使用預設飽食度: ${this.currentHunger}`);
+        }
+    }
+
+    // 從儲存資料初始化生命值
+    initializeLifeFromSave() {
+        if (this.currentLife !== null) {
+            // 已經初始化過了
+            return;
+        }
+
+        // 嘗試從 localStorage 載入生命值
+        if (this.gameData && this.gameData.tamagotchi && this.gameData.tamagotchi.life !== undefined) {
+            this.currentLife = this.gameData.tamagotchi.life;
+            console.log(`從儲存載入生命值: ${this.currentLife}`);
+        } else {
+            // 沒有儲存資料，使用預設值
+            this.currentLife = TAMAGOTCHI_STATS.MAX_LIFE;
+            console.log(`使用預設生命值: ${this.currentLife}`);
         }
     }
     
@@ -350,6 +375,59 @@ class TamagotchiGame {
         console.log(`飽食度更新: ${Math.floor(this.currentHunger)} (衰減: ${decay.toFixed(2)})`);
     }
 
+    // 更新生命值 (飽食度懲罰機制)
+    updateLife() {
+        if (this.timeSystem.isPaused) return;
+        if (this.currentLife === null || this.currentHunger === null) return;
+
+        const currentTime = Date.now();
+        if (this.lastLifeUpdate === 0) {
+            this.lastLifeUpdate = currentTime;
+            return;
+        }
+
+        // 只有當飽食度低於閾值時才減少生命值
+        if (this.currentHunger < TAMAGOTCHI_STATS.HUNGER_PENALTY_THRESHOLD) {
+            const timeDiff = currentTime - this.lastLifeUpdate;
+            const minutes = timeDiff / (1000 * 60);
+
+            // 生命值懲罰 = 每分鐘1點 × 時間流速 × 經過分鐘
+            const penalty = TAMAGOTCHI_STATS.LIFE_PENALTY_RATE * this.timeSystem.timeSpeed * minutes;
+
+            const oldLife = this.currentLife;
+            this.currentLife = Math.max(0, this.currentLife - penalty);
+
+            if (penalty > 0) {
+                console.log(`生命值懲罰: ${Math.floor(oldLife)} → ${Math.floor(this.currentLife)} (飽食度: ${Math.floor(this.currentHunger)} < ${TAMAGOTCHI_STATS.HUNGER_PENALTY_THRESHOLD})`);
+            }
+        }
+
+        this.lastLifeUpdate = currentTime;
+    }
+
+    // 檢查死亡狀態
+    checkDeath() {
+        if (this.currentLife === null || this.currentHunger === null) return false;
+
+        // 檢查生命值或飽食度是否為0
+        if (this.currentLife <= 0 || this.currentHunger <= 0) {
+            // 寵物死亡，直接將生命值歸零
+            this.currentLife = 0;
+
+            this.updateTamagotchiData({
+                isAlive: false,
+                life: 0,  // 死亡時生命值直接歸0
+                hunger: Math.max(0, this.currentHunger)
+            });
+
+            const deathReason = this.currentLife <= 0 ? '生命值歸零' : '飽食度歸零';
+            console.log(`寵物已死亡！原因：${deathReason}`);
+            return true;
+        }
+
+        return false;
+    }
+
     // 檢查進化條件
     checkEvolutionConditions() {
         if (!this.gameData || !this.gameData.tamagotchi || this.timeSystem.isPaused) {
@@ -501,8 +579,9 @@ class TamagotchiGame {
 
     // 開始遊戲循環
     startGameLoop() {
-        // 初始化飽食度更新時間
+        // 初始化更新時間
         this.lastHungerUpdate = Date.now();
+        this.lastLifeUpdate = Date.now();
 
         // 清除舊的定時器
         if (this.gameLoopInterval) {
@@ -515,12 +594,28 @@ class TamagotchiGame {
                 // 更新飽食度
                 this.updateHunger();
 
-                // 檢查進化條件
-                this.checkEvolutionConditions();
+                // 更新生命值 (飽食度懲罰機制)
+                this.updateLife();
+
+                // 檢查死亡狀態
+                const isDead = this.checkDeath();
+                if (isDead) {
+                    // 寵物死亡，通知UI更新死亡狀態
+                    if (this.gameInterface && this.gameInterface.updateDeathStatus) {
+                        this.gameInterface.updateDeathStatus();
+                    }
+                    console.log('遊戲循環：寵物已死亡');
+                }
+
+                // 檢查進化條件 (只有活著時才能進化)
+                if (!isDead) {
+                    this.checkEvolutionConditions();
+                }
 
                 // 同步到 localStorage
                 this.updateTamagotchiData({
                     hunger: this.currentHunger,
+                    life: this.currentLife,
                     coins: this.currentCoins
                 });
 
@@ -530,6 +625,9 @@ class TamagotchiGame {
                 }
                 if (this.gameInterface && this.gameInterface.updateCoinsDisplay) {
                     this.gameInterface.updateCoinsDisplay(Math.floor(this.currentCoins));
+                }
+                if (this.gameInterface && this.gameInterface.updateLifeDisplay) {
+                    this.gameInterface.updateLifeDisplay(Math.floor(this.currentLife));
                 }
             }
         }, 1000); // 每秒更新
@@ -757,8 +855,10 @@ class TamagotchiGame {
 
         // 重置記憶體中的遊戲變數
         this.currentHunger = TAMAGOTCHI_STATS.MAX_HUNGER;
+        this.currentLife = TAMAGOTCHI_STATS.MAX_LIFE;
         this.currentCoins = TAMAGOTCHI_STATS.INITIAL_COINS;
         this.lastHungerUpdate = 0;
+        this.lastLifeUpdate = 0;
 
         // 重置時間系統
         this.timeSystem.reset();
@@ -784,7 +884,7 @@ class TamagotchiGame {
             }, 0);
         }
 
-        console.log(`遊戲已重置 - 金錢: ${this.currentCoins}, 飽食度: ${Math.floor(this.currentHunger)}`);
+        console.log(`遊戲已重置 - 金錢: ${this.currentCoins}, 飽食度: ${Math.floor(this.currentHunger)}, 生命值: ${Math.floor(this.currentLife)}`);
     }
     
     // 更新電子雞資料

@@ -33,6 +33,10 @@ const TAMAGOTCHI_STATS = {
     CRITICAL_THRESHOLD: 20,
     WARNING_THRESHOLD: 40,
 
+    // 飽食度懲罰機制
+    HUNGER_PENALTY_THRESHOLD: 50,  // 飽食度低於此值時開始懲罰生命值
+    LIFE_PENALTY_RATE: 1,          // 生命值懲罰速率 (每分鐘減少點數)
+
     // 金幣系統
     INITIAL_COINS: 100,
     MIN_COINS: 0,

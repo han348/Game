@@ -158,6 +158,11 @@ class GameInterface {
 
         // 控制按鈕
         this.renderControlButtons();
+
+        // 檢查死亡狀態並更新UI（延遲執行確保所有UI元素已渲染）
+        setTimeout(() => {
+            this.updateDeathStatus();
+        }, 100);
     }
     
     // 實作重置確認彈窗的 UI
@@ -293,11 +298,12 @@ class GameInterface {
         // 動態狀態顯示
         const currentHunger = this.getCurrentHunger();
         const currentCoins = this.getCurrentCoins();
+        const currentLife = this.getCurrentLife();
         const stats = [
             `金幣: ${currentCoins}`,
             `飽食度: ${currentHunger}`,
             '好感度: 90',
-            '生命值: 85'
+            `生命值: ${currentLife}`
         ];
 
         stats.forEach((stat, index) => {
@@ -435,6 +441,16 @@ class GameInterface {
 
     // 更新餵食按鈕外觀
     updateFeedButtonAppearance(button, coins) {
+        // 檢查寵物是否死亡
+        if (this.isPetDead()) {
+            button.textContent = '餵食 (寵物已死亡)';
+            button.disabled = true;
+            button.style.backgroundColor = '#8B0000'; // 深紅色表示死亡
+            button.style.opacity = '0.6';
+            button.style.cursor = 'not-allowed';
+            return;
+        }
+
         if (coins >= 1) {
             button.textContent = '餵食 (1💰)';
             button.disabled = false;
@@ -516,7 +532,10 @@ class GameInterface {
     // 渲染時間資訊到 Canvas
     renderTimeInfo() {
         if (!this.timeSystem) return;
-        
+
+        // 如果寵物已死亡，不顯示時間資訊
+        if (this.isPetDead()) return;
+
         const timeInfo = this.timeSystem.getTimeInfo();
         
         // 清除舊的時間顯示區域
@@ -1223,6 +1242,100 @@ class GameInterface {
         this.updateFeedButtonState(coinsValue);
     }
 
+    // 更新生命值顯示
+    updateLifeDisplay(lifeValue) {
+        const statusItems = document.querySelectorAll('.status-item');
+        if (statusItems && statusItems[3]) { // 生命值是第四個項目
+            // 根據生命值設定顏色
+            let color = '#00FF00'; // 綠色 - 健康
+            if (lifeValue <= 20) {
+                color = '#FF0000'; // 紅色 - 危險
+            } else if (lifeValue <= 40) {
+                color = '#FFA500'; // 橙色 - 警告
+            }
+
+            statusItems[3].innerHTML = `<span class="status-value" style="color: ${color};">生命值: ${lifeValue}</span>`;
+        }
+    }
+
+    // 更新死亡狀態顯示
+    updateDeathStatus() {
+        const isDead = this.isPetDead();
+
+        if (isDead) {
+            // 停止時間顯示更新
+            this.stopTimeDisplayUpdate();
+
+            // 在畫布上顯示死亡訊息
+            this.showDeathMessage();
+
+            // 更新狀態欄顏色為紅色
+            this.updateDeathStatusColors();
+
+            // 更新按鈕狀態
+            this.updateButtonsForDeath();
+        }
+    }
+
+    // 在畫布上顯示死亡訊息
+    showDeathMessage() {
+        if (!this.canvas || !this.ctx) return;
+
+        // 清除畫布
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // 繪製背景
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // 繪製墓碑符號
+        this.ctx.fillStyle = '#808080';
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2 - 20;
+
+        // 簡單的墓碑形狀
+        this.ctx.fillRect(centerX - 10, centerY - 10, 20, 30);
+        this.ctx.fillRect(centerX - 15, centerY + 20, 30, 10);
+
+        // 顯示 RIP 文字
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '12px monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('R.I.P', centerX, centerY + 5);
+
+        // 顯示死亡訊息
+        this.ctx.fillStyle = '#FF0000';
+        this.ctx.font = '14px monospace';
+        this.ctx.fillText('寵物已死亡', centerX, centerY + 50);
+    }
+
+    // 更新死亡狀態時的顏色
+    updateDeathStatusColors() {
+        const statusItems = document.querySelectorAll('.status-item');
+
+        // 將生命值和飽食度都顯示為紅色
+        if (statusItems && statusItems[1]) { // 飽食度
+            const currentHunger = this.getCurrentHunger();
+            statusItems[1].innerHTML = `<span class="status-value" style="color: #FF0000;">飽食度: ${currentHunger}</span>`;
+        }
+
+        if (statusItems && statusItems[3]) { // 生命值
+            const currentLife = this.getCurrentLife();
+            statusItems[3].innerHTML = `<span class="status-value" style="color: #FF0000;">生命值: ${currentLife}</span>`;
+        }
+    }
+
+    // 更新按鈕狀態為死亡模式
+    updateButtonsForDeath() {
+        // 更新餵食按鈕
+        if (this.feedButton) {
+            const currentCoins = this.getCurrentCoins();
+            this.updateFeedButtonAppearance(this.feedButton, currentCoins);
+        }
+
+        // 可以在這裡添加其他按鈕的死亡狀態處理
+    }
+
     // 獲取當前飽食度 (供UI初始化使用)
     getCurrentHunger() {
         const gameInstance = getGameInstance();
@@ -1251,6 +1364,37 @@ class GameInterface {
         }
 
         return TAMAGOTCHI_STATS.INITIAL_COINS; // 最後的預設值
+    }
+
+    // 獲取當前生命值 (供UI初始化使用)
+    getCurrentLife() {
+        const gameInstance = getGameInstance();
+        if (gameInstance && gameInstance.currentLife !== null && gameInstance.currentLife !== undefined) {
+            return Math.floor(gameInstance.currentLife);
+        }
+
+        // 如果生命值尚未初始化，檢查是否有儲存資料
+        if (gameInstance && gameInstance.gameData && gameInstance.gameData.tamagotchi && gameInstance.gameData.tamagotchi.life !== undefined) {
+            return Math.floor(gameInstance.gameData.tamagotchi.life);
+        }
+
+        return TAMAGOTCHI_STATS.MAX_LIFE; // 最後的預設值
+    }
+
+    // 檢查寵物是否死亡
+    isPetDead() {
+        const gameInstance = getGameInstance();
+
+        // 檢查儲存資料中的 isAlive 狀態
+        if (gameInstance && gameInstance.gameData && gameInstance.gameData.tamagotchi) {
+            return gameInstance.gameData.tamagotchi.isAlive === false;
+        }
+
+        // 也檢查當前的生命值和飽食度
+        const currentLife = this.getCurrentLife();
+        const currentHunger = this.getCurrentHunger();
+
+        return currentLife <= 0 || currentHunger <= 0;
     }
 
     // 更新進化階段顯示 (僅更新寵物外觀，不顯示文字)
