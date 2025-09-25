@@ -20,6 +20,10 @@ class TamagotchiGame {
         // 生命值相關屬性
         this.currentLife = null; // 稍後從 localStorage 載入或設為預設值
         this.lastLifeUpdate = 0;
+
+        // 好感度相關屬性
+        this.currentAffection = null; // 稍後從 localStorage 載入或設為預設值
+        this.lastAffectionUpdate = 0;
     }
     
     // 初始化遊戲
@@ -129,6 +133,9 @@ class TamagotchiGame {
         // 初始化生命值 (從 localStorage 載入或設預設值)
         this.initializeLifeFromSave();
 
+        // 初始化好感度 (從 localStorage 載入或設預設值)
+        this.initializeAffectionFromSave();
+
         // 檢查是否需要初始化新的電子雞 (僅在首次遊戲時)
         if (!this.gameData.gameState.hasPlayedBefore) {
             this.initializeTamagotchi();
@@ -192,6 +199,24 @@ class TamagotchiGame {
             // 沒有儲存資料，使用預設值
             this.currentLife = TAMAGOTCHI_STATS.MAX_LIFE;
             console.log(`使用預設生命值: ${this.currentLife}`);
+        }
+    }
+
+    // 從儲存資料初始化好感度
+    initializeAffectionFromSave() {
+        if (this.currentAffection !== null) {
+            // 已經初始化過了
+            return;
+        }
+
+        // 嘗試從 localStorage 載入好感度
+        if (this.gameData && this.gameData.tamagotchi && this.gameData.tamagotchi.affection !== undefined) {
+            this.currentAffection = this.gameData.tamagotchi.affection;
+            console.log(`從儲存載入好感度: ${this.currentAffection}`);
+        } else {
+            // 沒有儲存資料，使用預設值
+            this.currentAffection = TAMAGOTCHI_STATS.MAX_AFFECTION;
+            console.log(`使用預設好感度: ${this.currentAffection}`);
         }
     }
     
@@ -356,6 +381,7 @@ class TamagotchiGame {
     // 更新飽食度
     updateHunger() {
         if (this.timeSystem.isPaused) return;
+        if (this.isPetRunaway()) return; // 離家出走時不更新飽食度
 
         const currentTime = Date.now();
         if (this.lastHungerUpdate === 0) {
@@ -378,6 +404,7 @@ class TamagotchiGame {
     // 更新生命值 (飽食度懲罰機制)
     updateLife() {
         if (this.timeSystem.isPaused) return;
+        if (this.isPetRunaway()) return; // 離家出走時不更新生命值
         if (this.currentLife === null || this.currentHunger === null) return;
 
         const currentTime = Date.now();
@@ -422,6 +449,59 @@ class TamagotchiGame {
 
             const deathReason = this.currentLife <= 0 ? '生命值歸零' : '飽食度歸零';
             console.log(`寵物已死亡！原因：${deathReason}`);
+            return true;
+        }
+
+        return false;
+    }
+
+    // 檢查寵物是否離家出走
+    isPetRunaway() {
+        if (this.gameData && this.gameData.tamagotchi) {
+            return this.gameData.tamagotchi.hasRunAway === true;
+        }
+        return false;
+    }
+
+    // 更新好感度
+    updateAffection() {
+        if (this.timeSystem.isPaused) return;
+        if (this.isPetRunaway()) return; // 離家出走時不更新好感度
+        if (this.currentAffection === null) return;
+
+        const currentTime = Date.now();
+        if (this.lastAffectionUpdate === 0) {
+            this.lastAffectionUpdate = currentTime;
+            return;
+        }
+
+        const timeDiff = currentTime - this.lastAffectionUpdate;
+        const minutes = timeDiff / (1000 * 60);
+
+        // 衰減 = 每分鐘2.5點 × 時間流速 × 經過分鐘
+        const decay = TAMAGOTCHI_STATS.AFFECTION_DECAY * this.timeSystem.timeSpeed * minutes;
+
+        const oldAffection = this.currentAffection;
+        this.currentAffection = Math.max(0, this.currentAffection - decay);
+        this.lastAffectionUpdate = currentTime;
+
+        if (decay > 0) {
+            console.log(`好感度更新: ${Math.floor(oldAffection)} → ${Math.floor(this.currentAffection)} (衰減: ${decay.toFixed(2)})`);
+        }
+    }
+
+    // 檢查離家出走狀態
+    checkRunaway() {
+        if (this.currentAffection === null) return false;
+
+        if (this.currentAffection <= TAMAGOTCHI_STATS.AFFECTION_RUNAWAY_THRESHOLD) {
+            // 寵物離家出走
+            this.updateTamagotchiData({
+                hasRunAway: true,
+                affection: 0
+            });
+
+            console.log('寵物已離家出走！原因：好感度歸零');
             return true;
         }
 
@@ -521,6 +601,17 @@ class TamagotchiGame {
 
     // 餵食功能
     feedPet() {
+        // 檢查寵物是否離家出走
+        if (this.isPetRunaway()) {
+            console.warn('寵物已離家出走，無法餵食');
+            return {
+                success: false,
+                reason: 'pet_runaway',
+                message: '寵物已離家出走，無法餵食',
+                currentCoins: this.currentCoins
+            };
+        }
+
         // 檢查金幣是否足夠
         if (this.currentCoins < 1) {
             console.warn('金幣不足，無法餵食');
@@ -577,11 +668,63 @@ class TamagotchiGame {
         };
     }
 
+    // 遊戲功能 (增加好感度)
+    playGame() {
+        // 檢查寵物是否死亡
+        if (this.gameData && this.gameData.tamagotchi && this.gameData.tamagotchi.isAlive === false) {
+            console.warn('寵物已死亡，無法進行遊戲');
+            return {
+                success: false,
+                reason: 'pet_dead',
+                message: '寵物已死亡，無法進行遊戲',
+                currentAffection: Math.floor(this.currentAffection)
+            };
+        }
+
+        // 檢查寵物是否離家出走
+        if (this.isPetRunaway()) {
+            console.warn('寵物已離家出走，無法進行遊戲');
+            return {
+                success: false,
+                reason: 'pet_runaway',
+                message: '寵物已離家出走，無法進行遊戲',
+                currentAffection: Math.floor(this.currentAffection)
+            };
+        }
+
+        const affectionIncrease = 10; // 每次遊戲增加10點好感度
+        const oldAffection = this.currentAffection;
+
+        // 增加好感度，但不超過最大值
+        this.currentAffection = Math.min(TAMAGOTCHI_STATS.MAX_AFFECTION, this.currentAffection + affectionIncrease);
+        const actualAffectionIncrease = this.currentAffection - oldAffection;
+
+        console.log(`遊戲完成: 好感度 ${Math.floor(oldAffection)} → ${Math.floor(this.currentAffection)} (+${actualAffectionIncrease.toFixed(1)})`);
+
+        // 更新到 localStorage
+        this.updateTamagotchiData({
+            affection: this.currentAffection
+        });
+
+        // 更新好感度顯示
+        if (this.gameInterface && this.gameInterface.updateAffectionDisplay) {
+            this.gameInterface.updateAffectionDisplay(Math.floor(this.currentAffection));
+        }
+
+        return {
+            success: true,
+            oldAffectionValue: Math.floor(oldAffection),
+            newAffectionValue: Math.floor(this.currentAffection),
+            affectionIncrease: actualAffectionIncrease
+        };
+    }
+
     // 開始遊戲循環
     startGameLoop() {
         // 初始化更新時間
         this.lastHungerUpdate = Date.now();
         this.lastLifeUpdate = Date.now();
+        this.lastAffectionUpdate = Date.now();
 
         // 清除舊的定時器
         if (this.gameLoopInterval) {
@@ -591,11 +734,26 @@ class TamagotchiGame {
         // 設定定時器每秒更新
         this.gameLoopInterval = setInterval(() => {
             if (this.gameState.isState(GameState.STATES.PLAYING)) {
+                // 檢查離家出走狀態
+                const hasRunAway = this.isPetRunaway();
+
+                // 如果寵物已離家出走，跳過所有屬性更新，只處理UI
+                if (hasRunAway) {
+                    if (this.gameInterface && this.gameInterface.updateRunawayStatus) {
+                        this.gameInterface.updateRunawayStatus();
+                    }
+                    return; // 離家出走時不進行任何屬性更新
+                }
+
+                // 正常遊戲循環：更新屬性
                 // 更新飽食度
                 this.updateHunger();
 
                 // 更新生命值 (飽食度懲罰機制)
                 this.updateLife();
+
+                // 更新好感度
+                this.updateAffection();
 
                 // 檢查死亡狀態
                 const isDead = this.checkDeath();
@@ -605,17 +763,28 @@ class TamagotchiGame {
                         this.gameInterface.updateDeathStatus();
                     }
                     console.log('遊戲循環：寵物已死亡');
+                    return; // 死亡時不需要檢查進化或離家出走
                 }
 
-                // 檢查進化條件 (只有活著時才能進化)
-                if (!isDead) {
-                    this.checkEvolutionConditions();
+                // 檢查離家出走狀態 (只有活著時才檢查)
+                const hasRunAwayNow = this.checkRunaway();
+                if (hasRunAwayNow) {
+                    // 寵物離家出走，通知UI更新離家出走狀態
+                    if (this.gameInterface && this.gameInterface.updateRunawayStatus) {
+                        this.gameInterface.updateRunawayStatus();
+                    }
+                    console.log('遊戲循環：寵物已離家出走');
+                    return; // 離家出走時不需要檢查進化
                 }
+
+                // 檢查進化條件 (只有活著且未離家出走時才能進化)
+                this.checkEvolutionConditions();
 
                 // 同步到 localStorage
                 this.updateTamagotchiData({
                     hunger: this.currentHunger,
                     life: this.currentLife,
+                    affection: this.currentAffection,
                     coins: this.currentCoins
                 });
 
@@ -628,6 +797,9 @@ class TamagotchiGame {
                 }
                 if (this.gameInterface && this.gameInterface.updateLifeDisplay) {
                     this.gameInterface.updateLifeDisplay(Math.floor(this.currentLife));
+                }
+                if (this.gameInterface && this.gameInterface.updateAffectionDisplay) {
+                    this.gameInterface.updateAffectionDisplay(Math.floor(this.currentAffection));
                 }
             }
         }, 1000); // 每秒更新
@@ -856,9 +1028,11 @@ class TamagotchiGame {
         // 重置記憶體中的遊戲變數
         this.currentHunger = TAMAGOTCHI_STATS.MAX_HUNGER;
         this.currentLife = TAMAGOTCHI_STATS.MAX_LIFE;
+        this.currentAffection = TAMAGOTCHI_STATS.MAX_AFFECTION;
         this.currentCoins = TAMAGOTCHI_STATS.INITIAL_COINS;
         this.lastHungerUpdate = 0;
         this.lastLifeUpdate = 0;
+        this.lastAffectionUpdate = 0;
 
         // 重置時間系統
         this.timeSystem.reset();
@@ -884,7 +1058,7 @@ class TamagotchiGame {
             }, 0);
         }
 
-        console.log(`遊戲已重置 - 金錢: ${this.currentCoins}, 飽食度: ${Math.floor(this.currentHunger)}, 生命值: ${Math.floor(this.currentLife)}`);
+        console.log(`遊戲已重置 - 金錢: ${this.currentCoins}, 飽食度: ${Math.floor(this.currentHunger)}, 生命值: ${Math.floor(this.currentLife)}, 好感度: ${Math.floor(this.currentAffection)}`);
     }
     
     // 更新電子雞資料

@@ -159,9 +159,10 @@ class GameInterface {
         // 控制按鈕
         this.renderControlButtons();
 
-        // 檢查死亡狀態並更新UI（延遲執行確保所有UI元素已渲染）
+        // 檢查死亡和離家出走狀態並更新UI（延遲執行確保所有UI元素已渲染）
         setTimeout(() => {
             this.updateDeathStatus();
+            this.updateRunawayStatus();
         }, 100);
     }
     
@@ -299,10 +300,11 @@ class GameInterface {
         const currentHunger = this.getCurrentHunger();
         const currentCoins = this.getCurrentCoins();
         const currentLife = this.getCurrentLife();
+        const currentAffection = this.getCurrentAffection();
         const stats = [
             `金幣: ${currentCoins}`,
             `飽食度: ${currentHunger}`,
-            '好感度: 90',
+            `好感度: ${currentAffection}`,
             `生命值: ${currentLife}`
         ];
 
@@ -333,7 +335,18 @@ class GameInterface {
         const feedButton = this.createFeedButton();
         
         const playButton = this.createButton('遊戲', () => {
-            console.log('遊戲');
+            const gameInstance = getGameInstance();
+            if (gameInstance && gameInstance.playGame) {
+                const result = gameInstance.playGame();
+                console.log('遊戲結果:', result);
+
+                // 如果遊戲失敗，可以在這裡添加視覺提示
+                if (!result.success) {
+                    console.warn(result.message);
+                }
+            } else {
+                console.log('遊戲實例未找到');
+            }
         });
         
         
@@ -533,8 +546,8 @@ class GameInterface {
     renderTimeInfo() {
         if (!this.timeSystem) return;
 
-        // 如果寵物已死亡，不顯示時間資訊
-        if (this.isPetDead()) return;
+        // 如果寵物已死亡或離家出走，不顯示時間資訊
+        if (this.isPetDead() || this.isPetRunaway()) return;
 
         const timeInfo = this.timeSystem.getTimeInfo();
         
@@ -1258,6 +1271,22 @@ class GameInterface {
         }
     }
 
+    // 更新好感度顯示
+    updateAffectionDisplay(affectionValue) {
+        const statusItems = document.querySelectorAll('.status-item');
+        if (statusItems && statusItems[2]) { // 好感度是第三個項目
+            // 根據好感度設定顏色
+            let color = '#FF69B4'; // 粉紅色 - 健康
+            if (affectionValue <= 20) {
+                color = '#FF0000'; // 紅色 - 危險
+            } else if (affectionValue <= 40) {
+                color = '#FFA500'; // 橙色 - 警告
+            }
+
+            statusItems[2].innerHTML = `<span class="status-value" style="color: ${color};">好感度: ${affectionValue}</span>`;
+        }
+    }
+
     // 更新死亡狀態顯示
     updateDeathStatus() {
         const isDead = this.isPetDead();
@@ -1333,7 +1362,128 @@ class GameInterface {
             this.updateFeedButtonAppearance(this.feedButton, currentCoins);
         }
 
-        // 可以在這裡添加其他按鈕的死亡狀態處理
+        // 禁用遊戲按鈕和其他互動按鈕
+        const allButtons = document.querySelectorAll('.game-button');
+        allButtons.forEach(button => {
+            const buttonText = button.textContent;
+            // 禁用遊戲、寵物圖鑑等互動按鈕，但保留重置、暫停等控制按鈕
+            if (buttonText.includes('遊戲') || buttonText.includes('寵物圖鑑')) {
+                if (!buttonText.includes('寵物已死亡')) {
+                    button.disabled = true;
+                    button.style.backgroundColor = '#8B0000';
+                    button.style.opacity = '0.6';
+                    button.style.cursor = 'not-allowed';
+                    if (buttonText.includes('遊戲')) {
+                        button.textContent = '遊戲 (寵物已死亡)';
+                    }
+                }
+            }
+        });
+    }
+
+    // 更新離家出走狀態顯示
+    updateRunawayStatus() {
+        const hasRunAway = this.isPetRunaway();
+
+        if (hasRunAway) {
+            // 停止時間顯示更新
+            this.stopTimeDisplayUpdate();
+
+            // 在畫布上顯示離家出走訊息
+            this.showRunawayMessage();
+
+            // 更新狀態欄顏色
+            this.updateRunawayStatusColors();
+
+            // 更新按鈕狀態為離家出走模式
+            this.updateButtonsForRunaway();
+        }
+    }
+
+    // 在畫布上顯示離家出走訊息
+    showRunawayMessage() {
+        if (!this.canvas || !this.ctx) return;
+
+        // 清除畫布
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // 繪製背景
+        this.ctx.fillStyle = '#2F4F4F';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // 繪製離家出走圖示 (簡單的房子和箭頭)
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2 - 20;
+
+        // 繪製房子
+        this.ctx.fillStyle = '#8B4513';
+        this.ctx.fillRect(centerX - 20, centerY - 5, 25, 20);
+
+        // 繪製屋頂
+        this.ctx.fillStyle = '#A0522D';
+        this.ctx.beginPath();
+        this.ctx.moveTo(centerX - 25, centerY - 5);
+        this.ctx.lineTo(centerX - 7.5, centerY - 15);
+        this.ctx.lineTo(centerX + 10, centerY - 5);
+        this.ctx.closePath();
+        this.ctx.fill();
+
+        // 繪製離開的箭頭
+        this.ctx.fillStyle = '#FFD700';
+        this.ctx.font = '20px monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('→', centerX + 25, centerY + 5);
+
+        // 顯示離家出走訊息
+        this.ctx.fillStyle = '#FF6347';
+        this.ctx.font = '14px monospace';
+        this.ctx.fillText('寵物已離家出走', centerX, centerY + 40);
+
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '10px monospace';
+        this.ctx.fillText('好感度太低了...', centerX, centerY + 55);
+    }
+
+    // 更新離家出走狀態時的顏色
+    updateRunawayStatusColors() {
+        const statusItems = document.querySelectorAll('.status-item');
+
+        // 將好感度顯示為紅色
+        if (statusItems && statusItems[2]) { // 好感度是第三個項目
+            const currentAffection = this.getCurrentAffection();
+            statusItems[2].innerHTML = `<span class="status-value" style="color: #FF0000;">好感度: ${currentAffection}</span>`;
+        }
+    }
+
+    // 更新按鈕狀態為離家出走模式 (只保留重置按鈕)
+    updateButtonsForRunaway() {
+        // 禁用餵食按鈕
+        if (this.feedButton) {
+            this.feedButton.textContent = '餵食 (寵物已離家出走)';
+            this.feedButton.disabled = true;
+            this.feedButton.style.backgroundColor = '#696969';
+            this.feedButton.style.opacity = '0.6';
+            this.feedButton.style.cursor = 'not-allowed';
+        }
+
+        // 禁用其他互動按鈕 (遊戲、寵物圖鑑等)
+        const allButtons = document.querySelectorAll('.game-button');
+        allButtons.forEach(button => {
+            const buttonText = button.textContent;
+            if (!buttonText.includes('重置') && !buttonText.includes('暫停') && !buttonText.includes('繼續') && !buttonText.includes('時間')) {
+                if (!buttonText.includes('寵物已離家出走')) {
+                    button.disabled = true;
+                    button.style.backgroundColor = '#696969';
+                    button.style.opacity = '0.6';
+                    button.style.cursor = 'not-allowed';
+
+                    // 更新遊戲按鈕文字
+                    if (buttonText.includes('遊戲')) {
+                        button.textContent = '遊戲 (寵物已離家出走)';
+                    }
+                }
+            }
+        });
     }
 
     // 獲取當前飽食度 (供UI初始化使用)
@@ -1381,6 +1531,21 @@ class GameInterface {
         return TAMAGOTCHI_STATS.MAX_LIFE; // 最後的預設值
     }
 
+    // 獲取當前好感度 (供UI初始化使用)
+    getCurrentAffection() {
+        const gameInstance = getGameInstance();
+        if (gameInstance && gameInstance.currentAffection !== null && gameInstance.currentAffection !== undefined) {
+            return Math.floor(gameInstance.currentAffection);
+        }
+
+        // 如果好感度尚未初始化，檢查是否有儲存資料
+        if (gameInstance && gameInstance.gameData && gameInstance.gameData.tamagotchi && gameInstance.gameData.tamagotchi.affection !== undefined) {
+            return Math.floor(gameInstance.gameData.tamagotchi.affection);
+        }
+
+        return TAMAGOTCHI_STATS.MAX_AFFECTION; // 最後的預設值
+    }
+
     // 檢查寵物是否死亡
     isPetDead() {
         const gameInstance = getGameInstance();
@@ -1395,6 +1560,21 @@ class GameInterface {
         const currentHunger = this.getCurrentHunger();
 
         return currentLife <= 0 || currentHunger <= 0;
+    }
+
+    // 檢查寵物是否離家出走
+    isPetRunaway() {
+        const gameInstance = getGameInstance();
+
+        // 檢查儲存資料中的 hasRunAway 狀態
+        if (gameInstance && gameInstance.gameData && gameInstance.gameData.tamagotchi) {
+            return gameInstance.gameData.tamagotchi.hasRunAway === true;
+        }
+
+        // 也檢查當前的好感度
+        const currentAffection = this.getCurrentAffection();
+
+        return currentAffection <= TAMAGOTCHI_STATS.AFFECTION_RUNAWAY_THRESHOLD;
     }
 
     // 更新進化階段顯示 (僅更新寵物外觀，不顯示文字)

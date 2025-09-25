@@ -26,7 +26,7 @@ const TAMAGOTCHI_STATS = {
 
     // 屬性衰減速度 (每分鐘)
     HUNGER_DECAY: 2,
-    AFFECTION_DECAY: 1,
+    AFFECTION_DECAY: 5,    // 每分鐘減少5點
     LIFE_DECAY: 0.5,
 
     // 危險閾值
@@ -36,6 +36,9 @@ const TAMAGOTCHI_STATS = {
     // 飽食度懲罰機制
     HUNGER_PENALTY_THRESHOLD: 50,  // 飽食度低於此值時開始懲罰生命值
     LIFE_PENALTY_RATE: 1,          // 生命值懲罰速率 (每分鐘減少點數)
+
+    // 離家出走機制
+    AFFECTION_RUNAWAY_THRESHOLD: 0, // 好感度低於此值時離家出走
 
     // 金幣系統
     INITIAL_COINS: 100,
