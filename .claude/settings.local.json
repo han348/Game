@@ -1,8 +1,21 @@
 {
-  "outputStyle": "default",
   "permissions": {
     "allow": [
       "Bash(python3:*)"
+    ]
+  },
+  "outputStyle": "default",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/post-task.sh"
+          }
+        ]
+      }
     ]
   }
 }

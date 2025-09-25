@@ -121,9 +121,9 @@ The game uses a 1-second update cycle that:
 
 ### Planned Features (from requirements.md)
 - Life/Health system with death mechanics
-- Happiness/affection system affecting evolution
+- Affection system affecting evolution
 - Cleaning and hygiene mechanics
 - Sleep cycle with day/night interactions
-- Mini-games for earning coins and increasing happiness
+- Mini-games for earning coins and increasing affection
 - Equipment and room decoration systems
 - Sickness and medical care mechanics

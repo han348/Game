@@ -41,7 +41,7 @@ class LocalStorageService {
                 experience: 0,
                 age: 0,
                 hunger: TAMAGOTCHI_STATS.MAX_HUNGER,
-                happiness: TAMAGOTCHI_STATS.MAX_HAPPINESS,
+                affection: TAMAGOTCHI_STATS.MAX_AFFECTION,
                 health: TAMAGOTCHI_STATS.MAX_HEALTH,
                 cleanliness: TAMAGOTCHI_STATS.MAX_CLEANLINESS,
                 coins: TAMAGOTCHI_STATS.INITIAL_COINS,

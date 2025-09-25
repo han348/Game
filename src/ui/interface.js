@@ -296,7 +296,7 @@ class GameInterface {
         const stats = [
             `金幣: ${currentCoins}`,
             `飽食度: ${currentHunger}`,
-            '快樂: 90',
+            '好感度: 90',
             '健康: 85',
             '清潔: 75'
         ];

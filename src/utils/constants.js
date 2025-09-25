@@ -21,13 +21,13 @@ const GAME_CONFIG = {
 const TAMAGOTCHI_STATS = {
     // 屬性範圍
     MAX_HUNGER: 100,
-    MAX_HAPPINESS: 100,
+    MAX_AFFECTION: 100,
     MAX_HEALTH: 100,
     MAX_CLEANLINESS: 100,
 
     // 屬性衰減速度 (每分鐘)
     HUNGER_DECAY: 2,
-    HAPPINESS_DECAY: 1,
+    AFFECTION_DECAY: 1,
     HEALTH_DECAY: 0.5,
     CLEANLINESS_DECAY: 1.5,
 
@@ -76,7 +76,7 @@ const PET_EVOLUTION = {
     EVOLUTION_CONDITIONS: {
         EGG_TO_BABY: {
             minAge: 1,        // 1天後孵化
-            minHappiness: 50
+            minAffection: 50
         },
         BABY_TO_ADULT: {
             minAge: 7,        // 7天後成年
@@ -88,19 +88,19 @@ const PET_EVOLUTION = {
     STAGE_MULTIPLIERS: {
         EGG: {
             hungerDecay: 0.5,    // 蛋階段餓得較慢
-            happinessDecay: 0.3,
+            affectionDecay: 0.3,
             healthDecay: 0.2,
             cleanlinessDecay: 0.1
         },
         BABY: {
             hungerDecay: 1.5,    // 幼年體餓得較快
-            happinessDecay: 1.2,
+            affectionDecay: 1.2,
             healthDecay: 0.8,
             cleanlinessDecay: 1.0
         },
         ADULT: {
             hungerDecay: 1.0,    // 成年體標準速度
-            happinessDecay: 1.0,
+            affectionDecay: 1.0,
             healthDecay: 1.0,
             cleanlinessDecay: 1.0
         }
